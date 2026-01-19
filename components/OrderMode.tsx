@@ -61,13 +61,25 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const handleAiRecommendation = async () => {
       setIsRecommending(true);
       try {
+          // 1. Get Recommendations
           const result = await recommendMenu(recipes, peopleCount);
           if (result && result.selectedIds) {
+              // 2. Update Cart
               const newCart: Record<string, number> = {};
               result.selectedIds.forEach((id: string) => {
                   newCart[id] = 1;
               });
               setCart(newCart);
+              
+              // 3. Auto-generate Menu Theme (Poster)
+              try {
+                 const themeResult = await generateMenuTheme(recipes, result.selectedIds);
+                 setMenuTheme(themeResult);
+              } catch (themeError) {
+                 console.error("Theme generation failed", themeError);
+                 // Proceed even if theme generation fails, just to show the cart update
+              }
+
               setShowAiModal(false);
               if (onShowToast) onShowToast(result.reasoning || "已为您生成菜单", 'success');
           }
@@ -393,7 +405,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                             >
                                 -
                             </button>
-                            <span className="text-xl font-bold w-4 text-center">{peopleCount}</span>
+                            <span className="text-xl font-bold min-w-[2rem] text-center text-gray-900">{peopleCount}</span>
                             <button 
                                 onClick={() => setPeopleCount(Math.min(20, peopleCount + 1))}
                                 className="w-8 h-8 rounded-full bg-[#1a472a] text-white flex items-center justify-center font-bold active:scale-90 transition-transform shadow-sm"
