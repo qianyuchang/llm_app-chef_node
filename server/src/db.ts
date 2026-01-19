@@ -56,12 +56,32 @@ const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH
   ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json')
   : path.join(__dirname, '../../db.json');
 
-console.log(`Using database file at: ${dbPath}`);
+console.log(`Initializing database at: ${dbPath}`);
 
-const adapter = new FileSync<DatabaseSchema>(dbPath);
-const db = (low as any)(adapter);
+// Ensure directory exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  console.log(`Database directory not found. Creating: ${dbDir}`);
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+  } catch (error) {
+    console.error('Failed to create database directory:', error);
+  }
+}
 
-// Initialize with defaults if empty
-db.defaults({ recipes: MOCK_RECIPES, categories: INITIAL_CATEGORIES }).write();
+let db: any;
+try {
+  const adapter = new FileSync<DatabaseSchema>(dbPath);
+  db = (low as any)(adapter);
+  // Initialize with defaults if empty
+  db.defaults({ recipes: MOCK_RECIPES, categories: INITIAL_CATEGORIES }).write();
+  console.log('Database initialized successfully.');
+} catch (error) {
+  console.error('CRITICAL: Database initialization failed:', error);
+  // Fallback to in-memory db logic or minimal mock if needed to keep server alive (optional)
+  // For now, let's just re-throw or handle it. 
+  // If we assume lowdb might fail on file permissions, we should know.
+  throw error; 
+}
 
 export default db;

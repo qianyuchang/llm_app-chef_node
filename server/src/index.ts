@@ -3,6 +3,15 @@ import cors from 'cors';
 import db from './db';
 import { GoogleGenAI, Type } from "@google/genai";
 import path from 'path';
+import fs from 'fs';
+
+// Global error handlers to prevent silent crashes
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 const app = express();
 // Railway requires using the PORT env variable. 
@@ -12,6 +21,10 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 // Initialize Gemini Client
 // Ensure API_KEY is set in your .env or Railway variables
 const apiKey = process.env.API_KEY;
+console.log('Initializing Gemini Client...');
+if (!apiKey) {
+  console.warn('WARNING: API_KEY is not set. AI features will be disabled.');
+}
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Middleware
@@ -23,11 +36,13 @@ app.use(express.json({ limit: '50mb' }) as any); // Increase limit for Base64 im
 // 1. Get All Recipes
 app.get('/api/recipes', (req, res) => {
   try {
+    console.log('GET /api/recipes');
     const recipes = db.get('recipes').value();
     // Sort by createdAt desc
-    const sorted = [...recipes].sort((a, b) => b.createdAt - a.createdAt);
+    const sorted = [...recipes].sort((a: any, b: any) => b.createdAt - a.createdAt);
     res.json(sorted);
   } catch (error) {
+    console.error('Error fetching recipes:', error);
     res.status(500).json({ error: 'Failed to fetch recipes' });
   }
 });
@@ -35,6 +50,7 @@ app.get('/api/recipes', (req, res) => {
 // 2. Create Recipe
 app.post('/api/recipes', (req, res) => {
   try {
+    console.log('POST /api/recipes');
     const newRecipe = req.body;
     
     // Simple validation
@@ -46,6 +62,7 @@ app.post('/api/recipes', (req, res) => {
     db.get('recipes').unshift(newRecipe).write();
     res.status(201).json(newRecipe);
   } catch (error) {
+    console.error('Error creating recipe:', error);
     res.status(500).json({ error: 'Failed to create recipe' });
   }
 });
@@ -53,6 +70,7 @@ app.post('/api/recipes', (req, res) => {
 // 3. Update Recipe
 app.put('/api/recipes/:id', (req, res) => {
   try {
+    console.log(`PUT /api/recipes/${req.params.id}`);
     const { id } = req.params;
     const updates = req.body;
 
@@ -67,6 +85,7 @@ app.put('/api/recipes/:id', (req, res) => {
     
     res.json(updated);
   } catch (error) {
+    console.error('Error updating recipe:', error);
     res.status(500).json({ error: 'Failed to update recipe' });
   }
 });
@@ -107,6 +126,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
         return;
     }
     try {
+        console.log('AI Request: Generate Menu');
         const { recipes, selectedIds } = req.body;
         const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
         const selectedNames = selectedRecipes.map((r: any) => r.title).join(", ");
@@ -119,7 +139,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // Updated to gemini-3-pro-preview for complex creative tasks
+            model: 'gemini-3-pro-preview', 
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
@@ -163,6 +183,7 @@ app.post('/api/ai/generate-prep', async (req, res) => {
         return;
     }
     try {
+        console.log('AI Request: Generate Prep List');
         const { recipes, selectedIds } = req.body;
         const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
         const ingredientsData = selectedRecipes.map((r: any) => 
@@ -179,7 +200,7 @@ app.post('/api/ai/generate-prep', async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview', // Updated to gemini-3-flash-preview for basic text tasks
+            model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 
@@ -192,18 +213,26 @@ app.post('/api/ai/generate-prep', async (req, res) => {
 
 // --- Serve Static Files (Frontend) ---
 // Serve static files from the React frontend app
-// When built, frontend is in root/dist, server is in server/dist
-// So relative path from server/dist/index.js to root/dist is ../../dist
 const staticPath = path.join(__dirname, '../../dist');
+console.log(`Serving static files from: ${staticPath}`);
+
+// Check if static path exists (warn if not)
+if (!fs.existsSync(staticPath)) {
+  console.warn(`WARNING: Static file directory ${staticPath} does not exist. Frontend will not be served.`);
+}
+
 app.use(express.static(staticPath));
 
 // Handle React Routing, return all requests to React app
-app.get('*', (req, res) => {
-    res.sendFile(path.join(staticPath, 'index.html'));
+app.get('*', (req: express.Request, res: express.Response) => {
+    if (fs.existsSync(path.join(staticPath, 'index.html'))) {
+      res.sendFile(path.join(staticPath, 'index.html'));
+    } else {
+      res.status(404).send('Frontend build not found');
+    }
 });
 
 // Start Server
-// Must listen on 0.0.0.0 for Docker containers
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
