@@ -11,14 +11,9 @@ export default defineConfig(({ mode }) => {
       // Expose API_KEY to the client-side code safely
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
     },
+    // No proxy needed for separate deployment strategy (Direct CORS request)
     server: {
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3001', // Default to local backend for development
-          changeOrigin: true,
-          secure: false,
-        }
-      }
+      port: 5173
     }
   };
 });

@@ -28,12 +28,17 @@ if (!apiKey) {
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Middleware
-app.use(cors());
+app.use(cors()); // Allow all CORS requests for separate deployment
 app.use(express.json({ limit: '50mb' }) as any); // Increase limit for Base64 images
 
 // Routes
 
-// 1. Get All Recipes
+// 1. Health Check (Useful for deployment platforms)
+app.get('/', (req, res) => {
+  res.send('ChefNote API Server is running.');
+});
+
+// 2. Get All Recipes
 app.get('/api/recipes', (req, res) => {
   try {
     console.log('GET /api/recipes');
@@ -47,7 +52,7 @@ app.get('/api/recipes', (req, res) => {
   }
 });
 
-// 2. Create Recipe
+// 3. Create Recipe
 app.post('/api/recipes', (req, res) => {
   try {
     console.log('POST /api/recipes');
@@ -67,7 +72,7 @@ app.post('/api/recipes', (req, res) => {
   }
 });
 
-// 3. Update Recipe
+// 4. Update Recipe
 app.put('/api/recipes/:id', (req, res) => {
   try {
     console.log(`PUT /api/recipes/${req.params.id}`);
@@ -90,7 +95,7 @@ app.put('/api/recipes/:id', (req, res) => {
   }
 });
 
-// 4. Get Categories
+// 5. Get Categories
 app.get('/api/categories', (req, res) => {
   try {
     const categories = db.get('categories').value();
@@ -100,7 +105,7 @@ app.get('/api/categories', (req, res) => {
   }
 });
 
-// 5. Update Categories
+// 6. Update Categories
 app.put('/api/categories', (req, res) => {
   try {
     const newCategories = req.body;
@@ -119,7 +124,7 @@ app.put('/api/categories', (req, res) => {
 
 // --- AI Routes ---
 
-// 6. Generate Menu Theme
+// 7. Generate Menu Theme
 app.post('/api/ai/generate-menu', async (req, res) => {
     if (!ai) {
         res.status(503).json({ error: 'Server API Key not configured' });
@@ -128,6 +133,12 @@ app.post('/api/ai/generate-menu', async (req, res) => {
     try {
         console.log('AI Request: Generate Menu');
         const { recipes, selectedIds } = req.body;
+        // Add safety check
+        if (!recipes || !selectedIds) {
+             res.status(400).json({ error: 'Missing recipes or selectedIds' });
+             return;
+        }
+
         const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
         const selectedNames = selectedRecipes.map((r: any) => r.title).join(", ");
         const date = new Date().toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -138,8 +149,9 @@ app.post('/api/ai/generate-menu', async (req, res) => {
             Please generate a sophisticated, high-end Chinese banquet menu theme.
         `;
 
+        // Switch to 'gemini-flash-latest' to avoid "preview" model quota limits
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview', 
+            model: 'gemini-flash-latest', 
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
@@ -170,13 +182,16 @@ app.post('/api/ai/generate-menu', async (req, res) => {
 
         const json = JSON.parse(response.text || '{}');
         res.json(json);
-    } catch (error) {
+    } catch (error: any) {
         console.error('AI Generate Menu Error:', error);
-        res.status(500).json({ error: 'Failed to generate menu' });
+        // Better error handling: extract the actual message from Google API
+        const errorMessage = error.message || 'Failed to generate menu';
+        const status = errorMessage.includes('quota') ? 429 : 500;
+        res.status(status).json({ error: errorMessage });
     }
 });
 
-// 7. Generate Prep List
+// 8. Generate Prep List
 app.post('/api/ai/generate-prep', async (req, res) => {
     if (!ai) {
         res.status(503).json({ error: 'Server API Key not configured' });
@@ -185,6 +200,11 @@ app.post('/api/ai/generate-prep', async (req, res) => {
     try {
         console.log('AI Request: Generate Prep List');
         const { recipes, selectedIds } = req.body;
+        if (!recipes || !selectedIds) {
+             res.status(400).json({ error: 'Missing recipes or selectedIds' });
+             return;
+        }
+
         const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
         const ingredientsData = selectedRecipes.map((r: any) => 
             `${r.title}: ${r.ingredients.map((i: any) => `${i.name} (${i.amount})`).join(', ')}`
@@ -199,36 +219,19 @@ app.post('/api/ai/generate-prep', async (req, res) => {
           Format as a simple checklist.
         `;
 
+        // Switch to 'gemini-flash-latest' to avoid "preview" model quota limits
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-flash-latest',
             contents: prompt,
         });
 
         res.json({ text: response.text });
-    } catch (error) {
+    } catch (error: any) {
         console.error('AI Generate Prep Error:', error);
-        res.status(500).json({ error: 'Failed to generate prep list' });
-    }
-});
-
-// --- Serve Static Files (Frontend) ---
-// Serve static files from the React frontend app
-const staticPath = path.join(__dirname, '../../dist');
-console.log(`Serving static files from: ${staticPath}`);
-
-// Check if static path exists (warn if not)
-if (!fs.existsSync(staticPath)) {
-  console.warn(`WARNING: Static file directory ${staticPath} does not exist. Frontend will not be served.`);
-}
-
-app.use(express.static(staticPath));
-
-// Handle React Routing, return all requests to React app
-app.get('*', (req, res) => {
-    if (fs.existsSync(path.join(staticPath, 'index.html'))) {
-      res.sendFile(path.join(staticPath, 'index.html'));
-    } else {
-      res.status(404).send('Frontend build not found');
+        // Better error handling
+        const errorMessage = error.message || 'Failed to generate prep list';
+        const status = errorMessage.includes('quota') ? 429 : 500;
+        res.status(status).json({ error: errorMessage });
     }
 });
 

@@ -1,17 +1,29 @@
 import { Recipe } from '../types';
 
-// Use relative URL.
-// In production, the frontend is served by the backend, so /api works perfectly regardless of the domain.
-// In development, Vite proxy forwards /api to the backend.
-export const API_BASE_URL = '/api';
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// ❗❗❗ 部署说明 / Deployment Instructions ❗❗❗
+// 前端现在直接连接后端，不再通过代理。
+// 1. 本地开发 (Local): 请确保后端运行在 3001 端口，此处填写 'http://localhost:3001/api'
+// 2. 生产环境 (Production): 部署前端前，请将此处修改为你的后端真实域名，例如 'https://your-backend.railway.app/api'
+//
+// UPDATED: Using production backend for all environments as requested.
+export const API_BASE_URL = 'https://llmapp-chefnode-production.up.railway.app/api';
 
 export const api = {
   getRecipes: async (): Promise<Recipe[]> => {
-    const response = await fetch(`${API_BASE_URL}/recipes`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch recipes');
+    try {
+      const response = await fetch(`${API_BASE_URL}/recipes`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch recipes');
+      }
+      return response.json();
+    } catch (error) {
+      console.error("API Error - check if backend is running at " + API_BASE_URL, error);
+      throw error;
     }
-    return response.json();
   },
 
   createRecipe: async (recipe: Recipe): Promise<Recipe> => {

@@ -8,10 +8,16 @@ export const generateMenuSuggestion = async (recipes: Recipe[], selectedIds: str
 
 export const generatePrepList = async (recipes: Recipe[], selectedIds: string[]) => {
     try {
+        // Optimization: Strip heavy fields (images, logs) to reduce payload size
+        // The backend only needs title and ingredients for prep list
+        const lightweightRecipes = recipes.map(({ id, title, category, ingredients }) => ({
+            id, title, category, ingredients
+        }));
+
         const response = await fetch(`${API_BASE_URL}/ai/generate-prep`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recipes, selectedIds })
+            body: JSON.stringify({ recipes: lightweightRecipes, selectedIds })
         });
 
         if (!response.ok) {
@@ -29,10 +35,16 @@ export const generatePrepList = async (recipes: Recipe[], selectedIds: string[])
 
 export const generateMenuTheme = async (recipes: Recipe[], selectedIds: string[]) => {
     try {
+        // Optimization: Strip heavy fields (images, logs) to reduce payload size
+        // The backend only needs title for menu theme
+        const lightweightRecipes = recipes.map(({ id, title, category }) => ({
+            id, title, category
+        }));
+
         const response = await fetch(`${API_BASE_URL}/ai/generate-menu`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recipes, selectedIds })
+            body: JSON.stringify({ recipes: lightweightRecipes, selectedIds })
         });
 
         if (!response.ok) {
