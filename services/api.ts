@@ -73,4 +73,20 @@ export const api = {
     }
     return response.json();
   },
+
+  optimizeImage: async (base64Image: string): Promise<string> => {
+    const response = await fetch(`${API_BASE_URL}/ai/optimize-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image: base64Image }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to optimize image');
+      }
+      const data = await response.json();
+      return data.image;
+  }
 };

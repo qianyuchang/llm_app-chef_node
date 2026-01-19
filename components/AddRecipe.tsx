@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Camera, Link as LinkIcon, Plus, Trash2, ChevronRight, Check, ChefHat } from 'lucide-react';
+import { ChevronLeft, Camera, Link as LinkIcon, Plus, Trash2, ChevronRight, Check, ChefHat, Sparkles, Loader2 } from 'lucide-react';
 import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
 import { ToastType } from './Toast';
 import { Button } from './Button';
 import { useSwipe } from '../hooks/useSwipe';
+import { api } from '../services/api';
 
 interface AddRecipeProps {
   categories: string[];
@@ -30,6 +31,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
   
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -64,6 +66,25 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
     setCoverImage(croppedImage);
     setIsCropping(false);
     setTempImage(null);
+  };
+
+  const handleOptimizeImage = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!coverImage) return;
+
+    setIsOptimizing(true);
+    try {
+        const optimized = await api.optimizeImage(coverImage);
+        setCoverImage(optimized);
+        onShowToast("照片已优化为美食大片", 'success');
+    } catch (err) {
+        console.error(err);
+        onShowToast("优化失败，请稍后重试", 'error');
+    } finally {
+        setIsOptimizing(false);
+    }
   };
 
   const addIngredient = () => setIngredients([...ingredients, {name: '', amount: ''}]);
@@ -158,7 +179,19 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
         <div className="flex flex-col items-center justify-center mb-4">
           <label className="relative w-32 h-32 rounded-[2rem] bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#1a472a]/50 transition-colors group shadow-sm">
              {coverImage ? (
-                 <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
+                 <>
+                     <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
+                     {/* AI Optimization Button Overlay */}
+                     <button
+                        onClick={handleOptimizeImage}
+                        disabled={isOptimizing}
+                        className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-[#1a472a] p-1.5 rounded-full shadow-sm flex items-center gap-1 hover:bg-white transition-all active:scale-95 disabled:opacity-70 z-10"
+                        title="AI 优化"
+                     >
+                         {isOptimizing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                         <span className="text-[10px] font-bold mr-0.5">AI优化</span>
+                     </button>
+                 </>
              ) : (
                  <>
                     <Camera className="text-gray-400 mb-1 group-hover:text-[#1a472a] transition-colors" size={24} />

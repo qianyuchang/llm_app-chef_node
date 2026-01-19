@@ -268,6 +268,67 @@ app.post('/api/ai/generate-prep', async (req, res) => {
     }
 });
 
+app.post('/api/ai/optimize-image', async (req, res) => {
+  if (!ai) {
+      res.status(503).json({ error: 'Server API Key not configured' });
+      return;
+  }
+  try {
+      console.log('AI Request: Optimize Image');
+      const { image } = req.body; // Base64 string
+      if (!image) {
+           res.status(400).json({ error: 'Missing image data' });
+           return;
+      }
+
+      // Strip prefix if present (e.g., "data:image/jpeg;base64,")
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+
+      const prompt = "Enhance this food photo. Make it look like professional high-end food photography with warm lighting, appetizing glossy texture, and studio quality. Keep the food items and composition exactly the same, but significantly improve the color grading and sharpness.";
+
+      const response = await ai.models.generateContent({
+          model: 'gemini-3-pro-image-preview', // Use pro model for better image editing
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: 'image/jpeg',
+                },
+              },
+              {
+                text: prompt,
+              },
+            ],
+          },
+          config: {
+             // imageConfig isn't strictly necessary for edits unless we want to force ratio/size
+          }
+      });
+      
+      let newImageBase64 = '';
+      if (response.candidates?.[0]?.content?.parts) {
+          for (const part of response.candidates[0].content.parts) {
+              if (part.inlineData && part.inlineData.data) {
+                  newImageBase64 = part.inlineData.data;
+                  break;
+              }
+          }
+      }
+
+      if (newImageBase64) {
+          // Re-attach prefix for frontend display
+          res.json({ image: `data:image/png;base64,${newImageBase64}` });
+      } else {
+          throw new Error("No image generated");
+      }
+
+  } catch (error: any) {
+      console.error('AI Optimize Image Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to optimize image' });
+  }
+});
+
 // Start Server with Graceful Shutdown
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

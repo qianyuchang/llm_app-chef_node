@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2, Sparkles } from 'lucide-react';
 import { Recipe, CookingLog } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
 import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
+import { api } from '../services/api';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -43,6 +44,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
 
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [processingLogId, setProcessingLogId] = useState<string | null>(null); // For individual log deletion/cover set
 
   // Swipe Handler
@@ -65,6 +67,23 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
     setNewLogImage(croppedImage);
     setIsCropping(false);
     setTempImage(null);
+  };
+
+  const handleOptimizeImage = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!newLogImage) return;
+
+    setIsOptimizing(true);
+    try {
+        const optimized = await api.optimizeImage(newLogImage);
+        setNewLogImage(optimized);
+        onShowToast("照片已优化", 'success');
+    } catch (err) {
+        console.error(err);
+        onShowToast("优化失败", 'error');
+    } finally {
+        setIsOptimizing(false);
+    }
   };
 
   const handleSaveLog = async () => {
@@ -323,6 +342,16 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                               <>
                                 <img src={newLogImage} alt="Preview" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity text-white font-medium">更换图片</div>
+                                {/* AI Optimization Button Overlay */}
+                                <button
+                                    onClick={handleOptimizeImage}
+                                    disabled={isOptimizing}
+                                    className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-[#1a472a] p-1.5 rounded-full shadow-sm flex items-center gap-1 hover:bg-white transition-all active:scale-95 disabled:opacity-70 z-20"
+                                    title="AI 优化"
+                                >
+                                    {isOptimizing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                    <span className="text-[10px] font-bold mr-0.5">AI优化</span>
+                                </button>
                               </>
                           ) : (
                               <>

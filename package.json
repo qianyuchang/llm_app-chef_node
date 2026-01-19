@@ -18,7 +18,8 @@
     "html-to-image": "^1.11.11",
     "react-easy-crop": "^5.0.5",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1"
+    "tailwind-merge": "^2.2.1",
+    "framer-motion": "^11.0.8"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
