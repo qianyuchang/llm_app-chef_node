@@ -85,8 +85,6 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
               }
 
               setShowAiModal(false);
-              // Only toast success if we are showing the poster, or just a generic success
-              if (onShowToast) onShowToast(result.reasoning || "已为您生成菜单", 'success');
           }
       } catch (error) {
           if (onShowToast) onShowToast("AI 推荐失败: " + (error as Error).message, 'error');

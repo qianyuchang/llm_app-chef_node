@@ -68,6 +68,32 @@ async function getCroppedImg(
   });
 }
 
+// Helper to resize image before sending to AI to avoid huge payloads
+const resizeForAI = async (imageSrc: string, maxDimension = 1024): Promise<string> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    let width = image.width;
+    let height = image.height;
+
+    if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+        } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+        }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return imageSrc;
+
+    ctx.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', 0.8); // Compress to JPEG 80%
+};
+
 export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComplete, onCancel, aspect = 1 }) => {
   const [currentImage, setCurrentImage] = useState(imageSrc);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
@@ -105,14 +131,17 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   const handleOptimize = async () => {
     setIsOptimizing(true);
     try {
-        // Optimization is done on the SOURCE image so we don't lose resolution or quality before cropping
-        const optimized = await api.optimizeImage(currentImage);
+        // 1. Resize image locally first to prevent timeout/payload issues
+        const resizedImage = await resizeForAI(currentImage);
+        
+        // 2. Send to API
+        const optimized = await api.optimizeImage(resizedImage);
         setCurrentImage(optimized);
-        // Reset zoom to ensure user sees the new image correctly, though keeping it is also fine
         setZoom(1); 
     } catch (err) {
         console.error(err);
-        alert('图片优化失败，请重试');
+        const msg = err instanceof Error ? err.message : '未知错误';
+        alert(`图片优化失败: ${msg}`);
     } finally {
         setIsOptimizing(false);
     }
@@ -141,9 +170,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       </div>
       
       {/* 
-         ADDED: 'touch-none' class is crucial here. 
-         It prevents the browser from handling touch actions (like scrolling/zooming the page),
-         allowing react-easy-crop to capture the gestures fully.
+         'touch-none' prevents browser scrolling/zooming, allowing cropper to work 
       */}
       <div className="relative flex-1 bg-black w-full h-full touch-none">
         <Cropper
@@ -159,13 +186,12 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         {isOptimizing && (
             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-20 backdrop-blur-sm">
                 <Loader2 className="animate-spin text-white mb-2" size={32} />
-                <span className="text-white font-medium text-sm">AI 正在修图...</span>
+                <span className="text-white font-medium text-sm">AI 正在修图 (大图可能需10秒)...</span>
             </div>
         )}
       </div>
 
       <div className="p-6 bg-black text-white pb-10 flex flex-col gap-4">
-         {/* AI Optimize Button moved here */}
          <button 
             onClick={handleOptimize}
             disabled={isOptimizing}
