@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Cropper from 'react-easy-crop';
 import { Check, X, Sparkles, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
@@ -103,6 +103,25 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   // AI Optimization State
   const [isOptimizing, setIsOptimizing] = useState(false);
 
+  // CRITICAL FIX FOR PWA/IOS GESTURES:
+  // Prevent the default touchmove behavior on the document level while this component is mounted.
+  // This stops the browser from scrolling/bouncing the page and forces it to yield touch events
+  // to the Cropper component.
+  useEffect(() => {
+    const preventDefault = (e: TouchEvent) => {
+        // Only prevent if we are scaling (2 fingers) or moving crop (1 finger inside area)
+        // But for a full-screen modal cropper, preventing all default moves is the safest/smoothest feel.
+        e.preventDefault();
+    };
+    
+    // { passive: false } is required to allow preventDefault
+    document.addEventListener('touchmove', preventDefault, { passive: false });
+    
+    return () => {
+        document.removeEventListener('touchmove', preventDefault);
+    };
+  }, []);
+
   const onCropChange = useCallback((crop: Point) => {
     setCrop(crop);
   }, []);
@@ -131,10 +150,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   const handleOptimize = async () => {
     setIsOptimizing(true);
     try {
-        // 1. Resize image locally first to prevent timeout/payload issues
         const resizedImage = await resizeForAI(currentImage);
-        
-        // 2. Send to API
         const optimized = await api.optimizeImage(resizedImage);
         setCurrentImage(optimized);
         setZoom(1); 
@@ -147,19 +163,9 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     }
   };
 
-  const stopPropagation = (e: React.TouchEvent | React.MouseEvent) => {
-      e.stopPropagation();
-  };
-
   return (
-    <div 
-        className="fixed inset-0 z-50 bg-black flex flex-col"
-        onTouchStart={stopPropagation}
-        onTouchMove={stopPropagation}
-        onTouchEnd={stopPropagation}
-        onClick={stopPropagation}
-    >
-      <div className="flex justify-between items-center p-4 z-10 bg-black/50 backdrop-blur-sm text-white absolute top-0 left-0 right-0">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col h-[100dvh]">
+      <div className="flex justify-between items-center p-4 z-10 bg-black/50 backdrop-blur-sm text-white absolute top-0 left-0 right-0 safe-top">
           <button onClick={onCancel} className="p-2">
             <X size={24} />
           </button>
@@ -170,9 +176,10 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       </div>
       
       {/* 
-         'touch-none' prevents browser scrolling/zooming, allowing cropper to work 
+         'touch-none' is CSS for 'touch-action: none'.
+         It tells the browser: "Do not handle panning or zooming on this element, let the JS handle it."
       */}
-      <div className="relative flex-1 bg-black w-full h-full touch-none">
+      <div className="relative flex-1 bg-black w-full h-full touch-none overflow-hidden">
         <Cropper
           image={currentImage}
           crop={crop}
@@ -181,6 +188,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           onCropChange={onCropChange}
           onZoomChange={onZoomChange}
           onCropComplete={onCropAreaChange}
+          showGrid={true}
         />
         
         {isOptimizing && (
@@ -191,7 +199,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         )}
       </div>
 
-      <div className="p-6 bg-black text-white pb-10 flex flex-col gap-4">
+      <div className="p-6 bg-black text-white pb-[calc(2.5rem+env(safe-area-inset-bottom))] flex flex-col gap-4 z-10">
          <button 
             onClick={handleOptimize}
             disabled={isOptimizing}

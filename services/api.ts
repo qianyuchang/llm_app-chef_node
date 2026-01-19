@@ -4,11 +4,15 @@ import { Recipe } from '../types';
 // CONFIGURATION
 // ============================================================================
 
-// ❗❗❗ 部署说明 / Deployment Instructions ❗❗❗
-// 1. 本地开发 (Local): 保持为 'http://localhost:3001/api'
-// 2. 生产环境 (Production): 部署前端前，请将此处修改为你的后端真实域名
-//
-export const API_BASE_URL = 'https://llmapp-chefnode-production.up.railway.app/api';
+// Check if running on localhost to switch API URL automatically
+const isLocal = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// 1. 本地开发: http://localhost:3001/api
+// 2. 生产环境: 使用 Railway URL
+export const API_BASE_URL = isLocal 
+  ? 'http://localhost:3001/api' 
+  : 'https://llmapp-chefnode-production.up.railway.app/api';
 
 export const api = {
   getRecipes: async (): Promise<Recipe[]> => {
@@ -19,7 +23,7 @@ export const api = {
       }
       return response.json();
     } catch (error) {
-      console.error("API Error - check if backend is running at " + API_BASE_URL, error);
+      console.error(`API Error (${API_BASE_URL})`, error);
       throw error;
     }
   },
