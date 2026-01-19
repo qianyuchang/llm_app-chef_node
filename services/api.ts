@@ -5,12 +5,10 @@ import { Recipe } from '../types';
 // ============================================================================
 
 // ❗❗❗ 部署说明 / Deployment Instructions ❗❗❗
-// 前端现在直接连接后端，不再通过代理。
-// 1. 本地开发 (Local): 请确保后端运行在 3001 端口，此处填写 'http://localhost:3001/api'
-// 2. 生产环境 (Production): 部署前端前，请将此处修改为你的后端真实域名，例如 'https://your-backend.railway.app/api'
+// 1. 本地开发 (Local): 保持为 'http://localhost:3001/api'
+// 2. 生产环境 (Production): 部署前端前，请将此处修改为你的后端真实域名
 //
-// UPDATED: Using production backend for all environments as requested.
-export const API_BASE_URL = 'https://llmapp-chefnode-production.up.railway.app/api';
+export const API_BASE_URL = 'http://localhost:3001/api';
 
 export const api = {
   getRecipes: async (): Promise<Recipe[]> => {

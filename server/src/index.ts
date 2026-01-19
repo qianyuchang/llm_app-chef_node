@@ -6,10 +6,10 @@ import path from 'path';
 import fs from 'fs';
 
 // Global error handlers to prevent silent crashes
-process.on('uncaughtException', (err) => {
+(process as any).on('uncaughtException', (err: any) => {
   console.error('CRITICAL: Uncaught Exception:', err);
 });
-process.on('unhandledRejection', (reason, promise) => {
+(process as any).on('unhandledRejection', (reason: any, promise: any) => {
   console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
@@ -149,9 +149,9 @@ app.post('/api/ai/generate-menu', async (req, res) => {
             Please generate a sophisticated, high-end Chinese banquet menu theme.
         `;
 
-        // Switch to 'gemini-flash-latest' to avoid "preview" model quota limits
+        // Use 'gemini-3-flash-preview' for better creative text generation
         const response = await ai.models.generateContent({
-            model: 'gemini-flash-latest', 
+            model: 'gemini-3-flash-preview', 
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
@@ -184,7 +184,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
         res.json(json);
     } catch (error: any) {
         console.error('AI Generate Menu Error:', error);
-        // Better error handling: extract the actual message from Google API
+        // Better error handling
         const errorMessage = error.message || 'Failed to generate menu';
         const status = errorMessage.includes('quota') ? 429 : 500;
         res.status(status).json({ error: errorMessage });
@@ -219,9 +219,9 @@ app.post('/api/ai/generate-prep', async (req, res) => {
           Format as a simple checklist.
         `;
 
-        // Switch to 'gemini-flash-latest' to avoid "preview" model quota limits
+        // Use 'gemini-3-flash-preview' for general text tasks
         const response = await ai.models.generateContent({
-            model: 'gemini-flash-latest',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
         });
 

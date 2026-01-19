@@ -50,11 +50,12 @@ const MOCK_RECIPES: Recipe[] = [
 ];
 
 // DETERMINE DB PATH
-// If RAILWAY_VOLUME_MOUNT_PATH is set (Production), use that.
-// Otherwise use local file path.
+// 1. Production (Railway Volume): Use RAILWAY_VOLUME_MOUNT_PATH env var
+// 2. Local Development: Use project root (process.cwd())
+// We avoid __dirname because it varies between ts-node (src/) and compiled build (dist/).
 const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
   ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json')
-  : path.join(__dirname, '../../db.json');
+  : path.join((process as any).cwd(), 'db.json');
 
 console.log(`Initializing database at: ${dbPath}`);
 
@@ -78,9 +79,6 @@ try {
   console.log('Database initialized successfully.');
 } catch (error) {
   console.error('CRITICAL: Database initialization failed:', error);
-  // Fallback to in-memory db logic or minimal mock if needed to keep server alive (optional)
-  // For now, let's just re-throw or handle it. 
-  // If we assume lowdb might fail on file permissions, we should know.
   throw error; 
 }
 
