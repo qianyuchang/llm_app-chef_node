@@ -198,7 +198,7 @@ const staticPath = path.join(__dirname, '../../dist');
 app.use(express.static(staticPath));
 
 // Handle React Routing, return all requests to React app
-app.get('*', (req: express.Request, res: express.Response) => {
+app.get('*', (req, res) => {
     res.sendFile(path.join(staticPath, 'index.html'));
 });
 

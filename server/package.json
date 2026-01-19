@@ -11,7 +11,7 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "lowdb": "1.0.0",
-    "@google/genai": "^0.0.12"
+    "@google/genai": "*"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
