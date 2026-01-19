@@ -236,7 +236,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
       </div>
 
       {/* Floating Bottom Bar */}
-      <div className="absolute bottom-6 left-4 right-4 bg-white/90 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-2 pl-3 flex items-center justify-between z-30 border border-white/50">
+      <div className="absolute left-4 right-4 bg-white/90 backdrop-blur-md rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-2 pl-3 flex items-center justify-between z-30 border border-white/50 bottom-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#1a472a] rounded-full flex items-center justify-center text-white relative shadow-md">
                 <ShoppingBag size={18} />

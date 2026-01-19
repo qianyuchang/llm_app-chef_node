@@ -193,7 +193,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto h-screen bg-[#f2f4f6] flex flex-col relative overflow-hidden sm:border-x sm:border-gray-200 shadow-2xl">
+    <div className="max-w-md mx-auto h-[100dvh] pt-[env(safe-area-inset-top)] bg-[#f2f4f6] flex flex-col relative overflow-hidden sm:border-x sm:border-gray-200 shadow-2xl">
       <div className="flex-1 overflow-hidden h-full">
         {renderView()}
       </div>

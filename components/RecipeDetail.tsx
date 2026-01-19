@@ -254,7 +254,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       </div>
 
       {/* Floating Action Button for Cooking Log */}
-      <div className="absolute bottom-6 right-6 z-30">
+      <div className="absolute right-6 z-30 bottom-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <button 
             onClick={() => setShowLogModal(true)}
             className="w-14 h-14 bg-[#1a472a] rounded-full flex items-center justify-center text-white shadow-xl shadow-green-900/30 hover:scale-105 active:scale-95 transition-all"
