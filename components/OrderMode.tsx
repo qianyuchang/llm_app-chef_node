@@ -14,17 +14,6 @@ interface OrderModeProps {
   onShowToast?: (message: string, type: ToastType) => void;
 }
 
-const COURSE_ORDER = ['前菜', '汤羹', '热菜', '主食', '甜品', '其他'];
-
-const mapCategoryToCourse = (category: string): string => {
-  if (['凉菜'].includes(category)) return '前菜';
-  if (['汤羹'].includes(category)) return '汤羹';
-  if (['炒菜', '炖菜', '清蒸'].includes(category)) return '热菜';
-  if (['主食', '面点'].includes(category)) return '主食';
-  if (['甜品'].includes(category)) return '甜品';
-  return '其他';
-};
-
 interface MenuThemeData {
   title: string;
   description: string;
@@ -155,11 +144,10 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
     ? recipes 
     : recipes.filter(r => r.category === activeCategory);
 
-  // Group selected recipes for menu card
+  // Group selected recipes by their ACTUAL category
   const groupedMenu = selectedRecipes.reduce((acc, recipe) => {
-    const course = mapCategoryToCourse(recipe.category);
-    if (!acc[course]) acc[course] = [];
-    acc[course].push(recipe);
+    if (!acc[recipe.category]) acc[recipe.category] = [];
+    acc[recipe.category].push(recipe);
     return acc;
   }, {} as Record<string, Recipe[]>);
 
@@ -400,16 +388,16 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                   {/* Divider */}
                   <div className="w-8 h-[1px] mb-8" style={{ backgroundColor: themeStyles.divider }}></div>
 
-                  {/* Course List */}
+                  {/* Course List - using Actual Categories */}
                   <div className="w-full flex-1 space-y-6">
-                      {COURSE_ORDER.map(course => {
-                          const courseRecipes = groupedMenu[course];
+                      {categories.map(category => {
+                          const courseRecipes = groupedMenu[category];
                           if (!courseRecipes || courseRecipes.length === 0) return null;
                           
                           return (
-                              <div key={course} className="w-full text-center">
+                              <div key={category} className="w-full text-center">
                                   <h3 className="text-sm font-bold tracking-widest mb-2 flex items-center justify-center gap-2" style={{ color: themeStyles.secondary }}>
-                                      <span className="opacity-50 text-[10px]">♦</span> {course} <span className="opacity-50 text-[10px]">♦</span>
+                                      <span className="opacity-50 text-[10px]">♦</span> {category} <span className="opacity-50 text-[10px]">♦</span>
                                   </h3>
                                   <div className="space-y-1">
                                       {courseRecipes.map(r => (

@@ -136,8 +136,13 @@ app.post('/api/ai/generate-menu', async (req, res) => {
 
         const prompt = `
             Today is ${date}. 
-            I have selected these dishes: ${selectedNames}.
+            I have selected these dishes for a meal: ${selectedNames}.
             Please generate a sophisticated, high-end Chinese banquet menu theme.
+
+            Requirements for 'description':
+            - Do NOT describe the dishes or ingredients.
+            - It MUST be a poetic, seasonal, or atmospheric sentence reflecting the mood (e.g., "The autumn breeze is refreshing," "A joyful gathering for the New Year," "Simple flavors of home").
+            - Keep it elegant and brief (under 20 words).
         `;
 
         const response = await ai.models.generateContent({
@@ -148,10 +153,10 @@ app.post('/api/ai/generate-menu', async (req, res) => {
                 responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    title: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    idiom: { type: Type.STRING },
-                    themeColor: { type: Type.STRING }
+                    title: { type: Type.STRING, description: "Theme title (e.g. 'Autumn Feast')" },
+                    description: { type: Type.STRING, description: "Seasonal or atmospheric text, NOT dish summary." },
+                    idiom: { type: Type.STRING, description: "A 4-character Chinese idiom" },
+                    themeColor: { type: Type.STRING, enum: ["red", "green", "blue", "neutral"] }
                 },
                 required: ["title", "description", "idiom", "themeColor"]
                 }
