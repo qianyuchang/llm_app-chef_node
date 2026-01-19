@@ -1,5 +1,6 @@
 import low from 'lowdb';
 import FileSync from 'lowdb/adapters/FileSync';
+import Memory from 'lowdb/adapters/Memory';
 import path from 'path';
 import fs from 'fs';
 
@@ -49,37 +50,50 @@ const MOCK_RECIPES: Recipe[] = [
   }
 ];
 
-// DETERMINE DB PATH
-// 1. Production (Railway Volume): Use RAILWAY_VOLUME_MOUNT_PATH env var
-// 2. Local Development: Use project root (process.cwd())
-// We avoid __dirname because it varies between ts-node (src/) and compiled build (dist/).
-const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
-  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json')
-  : path.join((process as any).cwd(), 'db.json');
-
-console.log(`Initializing database at: ${dbPath}`);
-
-// Ensure directory exists
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-  console.log(`Database directory not found. Creating: ${dbDir}`);
+// Helper to try initializing DB at a specific path
+function tryInitializeDb(filePath: string): any {
   try {
-    fs.mkdirSync(dbDir, { recursive: true });
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      console.log(`Creating directory: ${dir}`);
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const adapter = new FileSync<DatabaseSchema>(filePath);
+    const db = (low as any)(adapter);
+    db.defaults({ recipes: MOCK_RECIPES, categories: INITIAL_CATEGORIES }).write();
+    console.log(`Database initialized successfully at: ${filePath}`);
+    return db;
   } catch (error) {
-    console.error('Failed to create database directory:', error);
+    console.error(`Failed to initialize database at ${filePath}:`, error);
+    return null;
   }
 }
 
 let db: any;
-try {
-  const adapter = new FileSync<DatabaseSchema>(dbPath);
+
+// Strategy 1: Railway Volume (if configured)
+const railwayPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
+  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json') 
+  : null;
+
+if (railwayPath) {
+  console.log(`Attempting to use Railway Volume at: ${railwayPath}`);
+  db = tryInitializeDb(railwayPath);
+}
+
+// Strategy 2: Local File (Fallback)
+if (!db) {
+  const localPath = path.join((process as any).cwd(), 'db.json');
+  console.log(`Attempting to use local file at: ${localPath}`);
+  db = tryInitializeDb(localPath);
+}
+
+// Strategy 3: In-Memory (Last Resort to keep server alive)
+if (!db) {
+  console.warn('CRITICAL: File storage failed. Falling back to In-Memory database. Data will be lost on restart.');
+  const adapter = new Memory<DatabaseSchema>('db');
   db = (low as any)(adapter);
-  // Initialize with defaults if empty
   db.defaults({ recipes: MOCK_RECIPES, categories: INITIAL_CATEGORIES }).write();
-  console.log('Database initialized successfully.');
-} catch (error) {
-  console.error('CRITICAL: Database initialization failed:', error);
-  throw error; 
 }
 
 export default db;

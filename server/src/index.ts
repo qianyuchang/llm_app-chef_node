@@ -31,6 +31,12 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 app.use(cors()); // Allow all CORS requests for separate deployment
 app.use(express.json({ limit: '50mb' }) as any); // Increase limit for Base64 images
 
+// Request Logger (Helpful for debugging Railway health checks)
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Routes
 
 // 1. Health Check (Useful for deployment platforms)
@@ -41,7 +47,6 @@ app.get('/', (req, res) => {
 // 2. Get All Recipes
 app.get('/api/recipes', (req, res) => {
   try {
-    console.log('GET /api/recipes');
     const recipes = db.get('recipes').value();
     // Sort by createdAt desc
     const sorted = [...recipes].sort((a: any, b: any) => b.createdAt - a.createdAt);
@@ -55,7 +60,6 @@ app.get('/api/recipes', (req, res) => {
 // 3. Create Recipe
 app.post('/api/recipes', (req, res) => {
   try {
-    console.log('POST /api/recipes');
     const newRecipe = req.body;
     
     // Simple validation
@@ -75,7 +79,6 @@ app.post('/api/recipes', (req, res) => {
 // 4. Update Recipe
 app.put('/api/recipes/:id', (req, res) => {
   try {
-    console.log(`PUT /api/recipes/${req.params.id}`);
     const { id } = req.params;
     const updates = req.body;
 
