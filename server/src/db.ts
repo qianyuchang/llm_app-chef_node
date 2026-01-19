@@ -56,7 +56,13 @@ function tryInitializeDb(filePath: string): any {
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {
       console.log(`Creating directory: ${dir}`);
-      fs.mkdirSync(dir, { recursive: true });
+      // Use try-catch for mkdir specifically to handle permission issues gracefully
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (mkdirError) {
+        console.error(`Error creating directory ${dir}:`, mkdirError);
+        return null;
+      }
     }
     const adapter = new FileSync<DatabaseSchema>(filePath);
     const db = (low as any)(adapter);
@@ -72,6 +78,7 @@ function tryInitializeDb(filePath: string): any {
 let db: any;
 
 // Strategy 1: Railway Volume (if configured)
+// Use process.env['RAILWAY_VOLUME_MOUNT_PATH'] to be safe with types if needed
 const railwayPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
   ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json') 
   : null;
@@ -82,6 +89,7 @@ if (railwayPath) {
 }
 
 // Strategy 2: Local File (Fallback)
+// Use (process as any).cwd() to ensure it works in various TS environments
 if (!db) {
   const localPath = path.join((process as any).cwd(), 'db.json');
   console.log(`Attempting to use local file at: ${localPath}`);
