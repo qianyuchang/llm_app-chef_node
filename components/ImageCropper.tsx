@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
-import { Check, X } from 'lucide-react';
+import { Check, X, Sparkles, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
 // Define types locally to avoid import issues with esm.sh
 type Point = { x: number; y: number };
@@ -38,17 +39,13 @@ async function getCroppedImg(
   const maxSize = Math.max(image.width, image.height);
   const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
 
-  // set each dimensions to double largest dimension to allow for a safe area for the
-  // image to rotate in without being clipped by canvas context
   canvas.width = safeArea;
   canvas.height = safeArea;
 
-  // translate canvas context to a central location on image to allow rotating around the center.
   ctx.translate(safeArea / 2, safeArea / 2);
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.translate(-safeArea / 2, -safeArea / 2);
 
-  // draw rotated image and store data.
   ctx.drawImage(
     image,
     safeArea / 2 - image.width * 0.5,
@@ -57,27 +54,28 @@ async function getCroppedImg(
 
   const data = ctx.getImageData(0, 0, safeArea, safeArea);
 
-  // set canvas width to final desired crop size - this will clear existing context
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
 
-  // paste generated rotate image with correct offsets for x,y crop values.
   ctx.putImageData(
     data,
     0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x,
     0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y
   );
 
-  // As Base64 string
   return new Promise((resolve) => {
       resolve(canvas.toDataURL('image/jpeg', 0.8));
   });
 }
 
 export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComplete, onCancel, aspect = 1 }) => {
+  const [currentImage, setCurrentImage] = useState(imageSrc);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  
+  // AI Optimization State
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const onCropChange = useCallback((crop: Point) => {
     setCrop(crop);
@@ -94,7 +92,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   const handleSave = async () => {
     if (croppedAreaPixels) {
       try {
-        const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels);
+        const croppedImage = await getCroppedImg(currentImage, croppedAreaPixels);
         if (croppedImage) {
           onCropComplete(croppedImage);
         }
@@ -104,7 +102,22 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     }
   };
 
-  // Prevent touch events from bubbling up to parent swipe handlers
+  const handleOptimize = async () => {
+    setIsOptimizing(true);
+    try {
+        // Optimization is done on the SOURCE image so we don't lose resolution or quality before cropping
+        const optimized = await api.optimizeImage(currentImage);
+        setCurrentImage(optimized);
+        // Reset zoom to ensure user sees the new image correctly, though keeping it is also fine
+        setZoom(1); 
+    } catch (err) {
+        console.error(err);
+        alert('图片优化失败，请重试');
+    } finally {
+        setIsOptimizing(false);
+    }
+  };
+
   const stopPropagation = (e: React.TouchEvent | React.MouseEvent) => {
       e.stopPropagation();
   };
@@ -121,15 +134,20 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           <button onClick={onCancel} className="p-2">
             <X size={24} />
           </button>
-          <span className="font-bold">移动和缩放</span>
+          <span className="font-bold text-sm">调整封面</span>
           <button onClick={handleSave} className="p-2 text-[#4ade80]">
             <Check size={24} />
           </button>
       </div>
       
-      <div className="relative flex-1 bg-black w-full h-full">
+      {/* 
+         ADDED: 'touch-none' class is crucial here. 
+         It prevents the browser from handling touch actions (like scrolling/zooming the page),
+         allowing react-easy-crop to capture the gestures fully.
+      */}
+      <div className="relative flex-1 bg-black w-full h-full touch-none">
         <Cropper
-          image={imageSrc}
+          image={currentImage}
           crop={crop}
           zoom={zoom}
           aspect={aspect}
@@ -137,11 +155,28 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           onZoomChange={onZoomChange}
           onCropComplete={onCropAreaChange}
         />
+        
+        {isOptimizing && (
+            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-20 backdrop-blur-sm">
+                <Loader2 className="animate-spin text-white mb-2" size={32} />
+                <span className="text-white font-medium text-sm">AI 正在修图...</span>
+            </div>
+        )}
       </div>
 
-      <div className="p-6 bg-black text-white pb-10">
+      <div className="p-6 bg-black text-white pb-10 flex flex-col gap-4">
+         {/* AI Optimize Button moved here */}
+         <button 
+            onClick={handleOptimize}
+            disabled={isOptimizing}
+            className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+         >
+             <Sparkles size={16} fill="white" />
+             AI 美食滤镜优化
+         </button>
+
          <div className="flex items-center gap-4">
-            <span className="text-xs">缩放</span>
+            <span className="text-xs text-gray-400">缩放</span>
             <input
                 type="range"
                 value={zoom}
@@ -149,10 +184,8 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
                 max={3}
                 step={0.1}
                 aria-labelledby="Zoom"
-                onChange={(e) => {
-                setZoom(Number(e.target.value))
-                }}
-                className="w-full accent-[#1a472a]"
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-full accent-[#1a472a] h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
             />
          </div>
       </div>

@@ -44,7 +44,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
 
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
   const [processingLogId, setProcessingLogId] = useState<string | null>(null); // For individual log deletion/cover set
 
   // Swipe Handler
@@ -67,23 +66,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
     setNewLogImage(croppedImage);
     setIsCropping(false);
     setTempImage(null);
-  };
-
-  const handleOptimizeImage = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!newLogImage) return;
-
-    setIsOptimizing(true);
-    try {
-        const optimized = await api.optimizeImage(newLogImage);
-        setNewLogImage(optimized);
-        onShowToast("照片已优化", 'success');
-    } catch (err) {
-        console.error(err);
-        onShowToast("优化失败", 'error');
-    } finally {
-        setIsOptimizing(false);
-    }
   };
 
   const handleSaveLog = async () => {
@@ -339,20 +321,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                   <div className="mb-4">
                       <label className={`block w-full h-40 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-[#1a472a]/30 transition-all overflow-hidden relative ${isSaving ? 'pointer-events-none opacity-50' : ''}`}>
                           {newLogImage ? (
-                              <>
-                                <img src={newLogImage} alt="Preview" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity text-white font-medium">更换图片</div>
-                                {/* AI Optimization Button Overlay */}
-                                <button
-                                    onClick={handleOptimizeImage}
-                                    disabled={isOptimizing}
-                                    className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-[#1a472a] p-1.5 rounded-full shadow-sm flex items-center gap-1 hover:bg-white transition-all active:scale-95 disabled:opacity-70 z-20"
-                                    title="AI 优化"
-                                >
-                                    {isOptimizing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                    <span className="text-[10px] font-bold mr-0.5">AI优化</span>
-                                </button>
-                              </>
+                              <img src={newLogImage} alt="Preview" className="w-full h-full object-cover" />
                           ) : (
                               <>
                                   <Camera className="text-gray-300 mb-2" size={32} />
@@ -361,6 +330,11 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                           )}
                           <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} disabled={isSaving} />
                       </label>
+                      {newLogImage && (
+                          <div className="text-center mt-2">
+                             <button onClick={() => setNewLogImage(null)} className="text-xs text-red-500">重新上传</button>
+                          </div>
+                      )}
                   </div>
 
                   {/* Note Input */}
