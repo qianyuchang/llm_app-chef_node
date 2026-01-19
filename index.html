@@ -16,6 +16,7 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     
     <title>ChefNote</title>
+    <!-- We keep Tailwind CDN for simplicity, but in production usually recommend postcss -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -23,20 +24,15 @@
         font-family: 'Inter', sans-serif;
         background-color: #f2f4f6;
         -webkit-tap-highlight-color: transparent;
-        /* Prevent bounce scroll on iOS for a more native feel */
         overscroll-behavior-y: none;
       }
-      /* Hide scrollbar for Chrome, Safari and Opera */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
-      /* Hide scrollbar for IE, Edge and Firefox */
       .no-scrollbar {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
-      
-      /* Safe area padding for iPhones with notches */
       #root {
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
@@ -46,27 +42,27 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "html-to-image": "https://esm.sh/html-to-image@1.11.11",
-    "react-easy-crop": "https://esm.sh/react-easy-crop@5.0.4",
-    "tslib": "https://esm.sh/tslib@2.6.2",
+    "react-easy-crop": "https://esm.sh/react-easy-crop@^5.5.6",
     "react-easy-crop/": "https://esm.sh/react-easy-crop@^5.5.6/",
-    "express": "https://esm.sh/express@^5.2.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "path": "https://esm.sh/path@^0.12.7",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "cors": "https://esm.sh/cors@^2.8.5",
+    "lowdb": "https://esm.sh/lowdb@^7.0.1",
     "lowdb/": "https://esm.sh/lowdb@^7.0.1/",
-    "lowdb": "https://esm.sh/lowdb@^7.0.1"
+    "path": "https://esm.sh/path@^0.12.7",
+    "express": "https://esm.sh/express@^5.2.1",
+    "cors": "https://esm.sh/cors@^2.8.5",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "html-to-image": "https://esm.sh/html-to-image@^1.11.13"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
