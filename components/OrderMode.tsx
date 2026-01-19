@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Circle } from 'lucide-react';
-import { toPng } from 'html-to-image';
+import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2 } from 'lucide-react';
+import { toBlob } from 'html-to-image';
 import { Recipe } from '../types';
-import { generatePrepList, generateMenuTheme } from '../services/geminiService';
+import { generateMenuTheme } from '../services/geminiService';
 import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
+import { PROFICIENCY_TEXT } from '../constants';
 
 interface OrderModeProps {
   recipes: Recipe[];
@@ -33,7 +34,6 @@ interface MenuThemeData {
 
 export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBack, onShowToast }) => {
   const [activeCategory, setActiveCategory] = useState<string>('全部');
-  // Use a Set-like logic for selection. Value 1 means selected, 0 means not.
   const [cart, setCart] = useState<Record<string, number>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [prepResult, setPrepResult] = useState<string | null>(null);
@@ -77,36 +77,77 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
     }
   };
 
-  const handlePrepList = async () => {
+  // Local Prep List Aggregation
+  const handlePrepList = () => {
     if (totalItems === 0) return;
-    setIsGenerating(true);
-    try {
-        const result = await generatePrepList(recipes, selectedRecipeIds);
-        setPrepResult(result || '');
-    } catch (error) {
-        if (onShowToast) onShowToast("生成失败: " + (error as Error).message, 'error');
-        console.error(error);
-    } finally {
-        setIsGenerating(false);
-    }
+    
+    // Aggregation Logic
+    const summary: Record<string, string[]> = {};
+
+    selectedRecipes.forEach(recipe => {
+        recipe.ingredients.forEach(ing => {
+            const name = ing.name.trim();
+            if (!name) return;
+            if (!summary[name]) {
+                summary[name] = [];
+            }
+            if (ing.amount && ing.amount.trim()) {
+                summary[name].push(ing.amount);
+            }
+        });
+    });
+
+    // Formatting output
+    let text = "";
+    Object.keys(summary).forEach(name => {
+        const amounts = summary[name];
+        if (amounts.length > 0) {
+            text += `• ${name}: ${amounts.join(' + ')}\n`;
+        } else {
+            text += `• ${name}\n`;
+        }
+    });
+
+    if (!text) text = "没有找到相关食材信息";
+    setPrepResult(text);
   };
 
-  const downloadMenu = () => {
+  const downloadMenu = async () => {
     if (menuCardRef.current === null) {
       return;
     }
 
-    toPng(menuCardRef.current, { cacheBust: true, pixelRatio: 3 }) // High res
-      .then((dataUrl) => {
+    try {
+        const blob = await toBlob(menuCardRef.current, { cacheBust: true, pixelRatio: 3 });
+        if (!blob) throw new Error('Failed to generate image');
+
+        // PWA / Mobile Sharing Strategy
+        // If navigator.share is supported (standard on iOS/Android), use it to share the file directly.
+        // This is much more reliable in PWA mode than a download link.
+        if (navigator.share && navigator.canShare) {
+            const file = new File([blob], `menu-${Date.now()}.png`, { type: 'image/png' });
+            if (navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: '今日菜单',
+                    text: '来看看今天的菜单吧！'
+                });
+                return;
+            }
+        }
+
+        // Fallback for Desktop / Non-Share browsers
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.download = `menu-${Date.now()}.png`;
-        link.href = dataUrl;
+        link.href = url;
         link.click();
-      })
-      .catch((err) => {
-        console.error('oops, something went wrong!', err);
-        if (onShowToast) onShowToast("保存图片失败", 'error');
-      });
+        URL.revokeObjectURL(url);
+
+    } catch (err) {
+        console.error('Download failed', err);
+        if (onShowToast) onShowToast("保存/分享图片失败", 'error');
+    }
   };
 
   // Group recipes by category or show filtered list
@@ -215,6 +256,8 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
             <div className="space-y-6">
                 {displayRecipes.map(recipe => {
                     const selected = isSelected(recipe.id);
+                    const cookCount = recipe.logs ? recipe.logs.length : 0;
+                    
                     return (
                         <div 
                             key={recipe.id} 
@@ -237,9 +280,17 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="font-medium text-xs text-gray-400">
-                                    难度: {recipe.proficiency}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium text-xs text-[#1a472a]">
+                                            {PROFICIENCY_TEXT[recipe.proficiency]}
+                                        </span>
+                                        {cookCount > 0 && (
+                                            <span className="flex items-center text-[10px] text-orange-500 font-bold bg-orange-50 px-1.5 py-0.5 rounded-md border border-orange-100">
+                                                <Flame size={10} fill="currentColor" className="mr-0.5" />
+                                                {cookCount}
+                                            </span>
+                                        )}
+                                    </div>
                                     
                                     {/* Selection Toggle */}
                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${selected ? 'bg-[#1a472a] text-white shadow-md scale-110' : 'border-2 border-gray-200 text-transparent'}`}>
@@ -302,7 +353,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
         <div className="absolute inset-0 z-50 bg-black/40 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl transform transition-all scale-100">
                 <h3 className="font-bold text-lg mb-4 text-[#1a472a] flex items-center gap-2">
-                    📝 备菜清单
+                    📝 备菜汇总
                 </h3>
                 <div className="bg-[#f7f8fa] p-5 rounded-2xl text-sm text-gray-700 whitespace-pre-line max-h-80 overflow-y-auto custom-scrollbar leading-relaxed">
                     {prepResult}
@@ -404,8 +455,9 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                       onClick={downloadMenu}
                       className="flex items-center gap-2 bg-white text-gray-900 px-8 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-all hover:bg-gray-50"
                   >
-                      <Download size={18} />
-                      保存图片
+                      {/* Show Share icon on mobile if likely supported, else download */}
+                      {navigator.share ? <Share2 size={18} /> : <Download size={18} />}
+                      {navigator.share ? '保存/分享图片' : '下载图片'}
                   </button>
               </div>
            </div>
