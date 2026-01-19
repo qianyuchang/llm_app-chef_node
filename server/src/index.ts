@@ -117,13 +117,77 @@ app.put('/api/categories', (req, res) => {
 
 // --- AI Routes ---
 
+app.post('/api/ai/recommend-menu', async (req, res) => {
+  if (!ai) {
+      res.status(503).json({ error: 'Server API Key not configured' });
+      return;
+  }
+  try {
+      console.log('AI Request: Recommend Menu');
+      const { recipes, peopleCount } = req.body;
+      if (!recipes || !peopleCount) {
+           res.status(400).json({ error: 'Missing recipes or peopleCount' });
+           return;
+      }
+
+      // Get current season
+      const month = new Date().getMonth() + 1;
+      let season = 'Winter';
+      if (month >= 3 && month <= 5) season = 'Spring';
+      else if (month >= 6 && month <= 8) season = 'Summer';
+      else if (month >= 9 && month <= 11) season = 'Autumn';
+
+      const prompt = `
+          I have a list of recipes (JSON). 
+          I need to select dishes for a meal for ${peopleCount} people.
+          Current Season: ${season}.
+
+          Rules for selection:
+          1. Quantity: Usually number of dishes = people count + 1 (or -1 if small eaters), ensure it's enough but not wasteful.
+          2. Balance: Mix of meat, vegetables, and soup if available.
+          3. Seasonality: Prefer dishes suitable for ${season}.
+          4. Variety: Try not to repeat main ingredients too much.
+
+          Available Recipes: 
+          ${JSON.stringify(recipes.map((r: any) => ({ id: r.id, title: r.title, category: r.category, ingredients: r.ingredients })))}
+
+          Return a JSON object containing an array of selected recipe IDs.
+      `;
+
+      const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview', 
+          contents: prompt,
+          config: { 
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    selectedIds: { 
+                      type: Type.ARRAY, 
+                      items: { type: Type.STRING },
+                      description: "Array of recipe IDs to add to cart"
+                    },
+                    reasoning: { type: Type.STRING, description: "Short explanation in Chinese why this menu was chosen." }
+                },
+                required: ["selectedIds"]
+              }
+          }
+      });
+      const json = JSON.parse(response.text || '{}');
+      res.json(json);
+  } catch (error: any) {
+      console.error('AI Recommend Menu Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to recommend menu' });
+  }
+});
+
 app.post('/api/ai/generate-menu', async (req, res) => {
     if (!ai) {
         res.status(503).json({ error: 'Server API Key not configured' });
         return;
     }
     try {
-        console.log('AI Request: Generate Menu');
+        console.log('AI Request: Generate Menu Theme');
         const { recipes, selectedIds } = req.body;
         if (!recipes || !selectedIds) {
              res.status(400).json({ error: 'Missing recipes or selectedIds' });

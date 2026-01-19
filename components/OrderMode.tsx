@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2 } from 'lucide-react';
+import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2, Users, Bot } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Recipe } from '../types';
-import { generateMenuTheme } from '../services/geminiService';
+import { generateMenuTheme, recommendMenu } from '../services/geminiService';
 import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
 import { PROFICIENCY_TEXT } from '../constants';
@@ -29,6 +29,11 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const [menuTheme, setMenuTheme] = useState<MenuThemeData | null>(null);
   const menuCardRef = useRef<HTMLDivElement>(null);
 
+  // AI Recommendation State
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [peopleCount, setPeopleCount] = useState(2);
+  const [isRecommending, setIsRecommending] = useState(false);
+
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
 
@@ -51,6 +56,27 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const totalItems = Object.keys(cart).length;
   const selectedRecipeIds = Object.keys(cart);
   const selectedRecipes = recipes.filter(r => selectedRecipeIds.includes(r.id));
+
+  // --- AI Logic ---
+  const handleAiRecommendation = async () => {
+      setIsRecommending(true);
+      try {
+          const result = await recommendMenu(recipes, peopleCount);
+          if (result && result.selectedIds) {
+              const newCart: Record<string, number> = {};
+              result.selectedIds.forEach((id: string) => {
+                  newCart[id] = 1;
+              });
+              setCart(newCart);
+              setShowAiModal(false);
+              if (onShowToast) onShowToast(result.reasoning || "已为您生成菜单", 'success');
+          }
+      } catch (error) {
+          if (onShowToast) onShowToast("AI 推荐失败: " + (error as Error).message, 'error');
+      } finally {
+          setIsRecommending(false);
+      }
+  };
 
   const handleGenerateMenu = async () => {
     if (totalItems === 0) return;
@@ -204,7 +230,13 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
             <ChevronLeft size={24} className="text-gray-800"/>
         </button>
         <h1 className="text-lg font-bold text-gray-800">点菜模式</h1>
-        <div className="w-8"></div> {/* spacer */}
+        <button 
+            onClick={() => setShowAiModal(true)}
+            className="text-[#1a472a] font-bold text-xs flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-full hover:bg-green-100 transition-colors"
+        >
+            <Bot size={16} />
+            AI 帮点
+        </button>
       </div>
 
       {/* Main Split View */}
@@ -335,6 +367,71 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
             </button>
         </div>
       </div>
+
+      {/* AI Recommendation Modal */}
+      {showAiModal && (
+        <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-6">
+                <div className="text-center">
+                    <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3 text-[#1a472a]">
+                        <Bot size={24} />
+                    </div>
+                    <h3 className="font-bold text-lg text-gray-800">AI 智能点菜</h3>
+                    <p className="text-sm text-gray-400 mt-1">根据人数和时令自动搭配一桌好菜</p>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl">
+                        <span className="text-gray-700 font-medium flex items-center gap-2">
+                            <Users size={18} className="text-gray-400" />
+                            用餐人数
+                        </span>
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setPeopleCount(Math.max(1, peopleCount - 1))}
+                                className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 font-bold active:scale-90 transition-transform"
+                            >
+                                -
+                            </button>
+                            <span className="text-xl font-bold w-4 text-center">{peopleCount}</span>
+                            <button 
+                                onClick={() => setPeopleCount(Math.min(20, peopleCount + 1))}
+                                className="w-8 h-8 rounded-full bg-[#1a472a] text-white flex items-center justify-center font-bold active:scale-90 transition-transform shadow-sm"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                    <button 
+                        onClick={() => setShowAiModal(false)}
+                        className="flex-1 py-3.5 bg-gray-100 rounded-xl font-bold text-gray-600 text-sm"
+                    >
+                        取消
+                    </button>
+                    <button 
+                        onClick={handleAiRecommendation}
+                        disabled={isRecommending}
+                        className="flex-1 py-3.5 bg-[#1a472a] text-white rounded-xl font-bold text-sm shadow-lg shadow-green-900/20 flex items-center justify-center gap-2"
+                    >
+                        {isRecommending ? (
+                            <>
+                                <Sparkles size={16} className="animate-spin" />
+                                思考中...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={16} fill="white" />
+                                开始生成
+                            </>
+                        )}
+                    </button>
+                </div>
+           </div>
+        </div>
+      )}
 
       {/* Prep List Modal */}
       {prepResult && (

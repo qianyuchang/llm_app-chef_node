@@ -6,6 +6,31 @@ export const generateMenuSuggestion = async (recipes: Recipe[], selectedIds: str
     return "Menu suggestion feature moved to backend.";
 };
 
+export const recommendMenu = async (recipes: Recipe[], peopleCount: number) => {
+    try {
+        // Optimization: Strip heavy fields
+        const lightweightRecipes = recipes.map(({ id, title, category, ingredients }) => ({
+            id, title, category, ingredients
+        }));
+
+        const response = await fetch(`${API_BASE_URL}/ai/recommend-menu`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipes: lightweightRecipes, peopleCount })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Server error');
+        }
+
+        return await response.json(); // { selectedIds: string[], reasoning: string }
+    } catch (error) {
+        console.error("Error recommending menu:", error);
+        throw error;
+    }
+}
+
 export const generatePrepList = async (recipes: Recipe[], selectedIds: string[]) => {
     try {
         // Optimization: Strip heavy fields (images, logs) to reduce payload size

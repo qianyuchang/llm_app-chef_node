@@ -9,6 +9,7 @@ import { Recipe, ViewState } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 import { Toast, ToastType } from './components/Toast';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('HOME');
@@ -17,6 +18,9 @@ const App: React.FC = () => {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Navigation Direction (1 = push, -1 = pop)
+  const [direction, setDirection] = useState(0);
+
   // Toast State
   const [toast, setToast] = useState<{message: string, type: ToastType} | null>(null);
 
@@ -52,6 +56,7 @@ const App: React.FC = () => {
         setSelectedRecipe(updatedRecipe); 
         
         if (currentView === 'ADD_RECIPE') {
+             setDirection(1); // Push to detail
              setCurrentView('RECIPE_DETAIL');
         }
         showToast('菜谱更新成功');
@@ -72,6 +77,7 @@ const App: React.FC = () => {
       try {
         const savedRecipe = await api.createRecipe(newRecipe);
         setRecipes(prev => [savedRecipe, ...prev]);
+        setDirection(-1); // Pop back to home
         setCurrentView('HOME');
         showToast('新菜谱已添加');
       } catch (error) {
@@ -124,30 +130,29 @@ const App: React.FC = () => {
 
   const handleRecipeClick = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
+    setDirection(1); // Push
     setCurrentView('RECIPE_DETAIL');
   };
 
   const handleEditRecipe = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
+    setDirection(1); // Push
     setCurrentView('ADD_RECIPE');
   };
 
-  const renderView = () => {
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <Loader2 className="animate-spin text-[#1a472a]" size={32} />
-        </div>
-      );
-    }
+  const navigateTo = (view: ViewState, dir: number) => {
+      setDirection(dir);
+      setCurrentView(view);
+  };
 
+  const renderViewContent = () => {
     switch (currentView) {
       case 'HOME':
         return (
           <Home 
             recipes={recipes} 
             categories={categories}
-            onOrderModeClick={() => setCurrentView('ORDER_MODE')}
+            onOrderModeClick={() => navigateTo('ORDER_MODE', 1)}
             onRecipeClick={handleRecipeClick}
           />
         );
@@ -157,9 +162,9 @@ const App: React.FC = () => {
             categories={categories}
             onBack={() => {
                 if (selectedRecipe && currentView === 'ADD_RECIPE') {
-                     setCurrentView('RECIPE_DETAIL');
+                     navigateTo('RECIPE_DETAIL', -1);
                 } else {
-                     setCurrentView('HOME');
+                     navigateTo('HOME', -1);
                 }
             }} 
             onSave={handleSaveRecipe}
@@ -172,7 +177,7 @@ const App: React.FC = () => {
           <OrderMode 
             recipes={recipes}
             categories={categories}
-            onBack={() => setCurrentView('HOME')} 
+            onBack={() => navigateTo('HOME', -1)} 
             onShowToast={showToast}
           />
         );
@@ -182,7 +187,7 @@ const App: React.FC = () => {
             categories={categories}
             onUpdateCategories={handleUpdateCategories}
             onRenameCategory={handleRenameCategory}
-            onBack={() => setCurrentView('HOME')}
+            onBack={() => navigateTo('HOME', -1)}
           />
         );
       case 'RECIPE_DETAIL':
@@ -191,27 +196,15 @@ const App: React.FC = () => {
             recipe={selectedRecipe} 
             onBack={() => {
                 setSelectedRecipe(null);
-                setCurrentView('HOME');
+                navigateTo('HOME', -1);
             }}
             onEdit={handleEditRecipe}
             onUpdate={handleSaveRecipe}
             onShowToast={showToast}
           />
-        ) : <Home 
-              recipes={recipes} 
-              categories={categories}
-              onOrderModeClick={() => setCurrentView('ORDER_MODE')}
-              onRecipeClick={handleRecipeClick}
-            />;
+        ) : null;
       default:
-        return (
-          <Home 
-            recipes={recipes} 
-            categories={categories}
-            onOrderModeClick={() => setCurrentView('ORDER_MODE')}
-            onRecipeClick={handleRecipeClick}
-          />
-        );
+        return null;
     }
   };
 
@@ -222,13 +215,61 @@ const App: React.FC = () => {
       if (view === 'ADD_RECIPE') {
           setSelectedRecipe(null);
       }
+      setDirection(1); // Navbar taps usually feel like entering a new context or stack
       setCurrentView(view);
+  };
+
+  // Framer Motion Variants for iOS-style Push/Pop
+  const variants = {
+    initial: (dir: number) => ({
+      x: dir > 0 ? '100%' : '-25%', // Enter from right (push) or slightly left (pop)
+      opacity: dir > 0 ? 1 : 0.9,
+      zIndex: dir > 0 ? 10 : 1
+    }),
+    animate: {
+      x: 0,
+      opacity: 1,
+      zIndex: 1,
+      transition: { 
+          type: "spring", 
+          stiffness: 260, 
+          damping: 30 
+      }
+    },
+    exit: (dir: number) => ({
+      x: dir > 0 ? '-25%' : '100%', // Exit to left (push) or right (pop)
+      opacity: dir > 0 ? 0.9 : 1,
+      zIndex: dir > 0 ? 1 : 10,
+      transition: { 
+        type: "spring", 
+        stiffness: 260, 
+        damping: 30 
+    }
+    })
   };
 
   return (
     <div className="max-w-md mx-auto h-[100dvh] pt-[env(safe-area-inset-top)] bg-[#f2f4f6] flex flex-col relative overflow-hidden sm:border-x sm:border-gray-200 shadow-2xl">
-      <div className="flex-1 overflow-hidden h-full">
-        {renderView()}
+      <div className="flex-1 relative overflow-hidden h-full w-full">
+         {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+               <Loader2 className="animate-spin text-[#1a472a]" size={32} />
+            </div>
+         ) : (
+            <AnimatePresence initial={false} custom={direction} mode='popLayout'>
+                <motion.div
+                    key={currentView}
+                    custom={direction}
+                    variants={variants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="absolute inset-0 w-full h-full bg-[#f2f4f6] shadow-2xl"
+                >
+                    {renderViewContent()}
+                </motion.div>
+            </AnimatePresence>
+         )}
       </div>
       
       {showNavbar && (
