@@ -4,6 +4,7 @@ import db from './db';
 import { GoogleGenAI, Type } from "@google/genai";
 import path from 'path';
 import fs from 'fs';
+import { Server } from 'http';
 
 // Global error handlers to prevent silent crashes
 (process as any).on('uncaughtException', (err: any) => {
@@ -15,11 +16,9 @@ import fs from 'fs';
 
 const app = express();
 // Railway requires using the PORT env variable. 
-// Default to 3001 only for local development.
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 // Initialize Gemini Client
-// Ensure API_KEY is set in your .env or Railway variables
 const apiKey = process.env.API_KEY;
 console.log('Initializing Gemini Client...');
 if (!apiKey) {
@@ -28,10 +27,10 @@ if (!apiKey) {
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Middleware
-app.use(cors()); // Allow all CORS requests for separate deployment
-app.use(express.json({ limit: '50mb' }) as any); // Increase limit for Base64 images
+app.use(cors()); 
+app.use(express.json({ limit: '50mb' }) as any);
 
-// Request Logger (Helpful for debugging Railway health checks)
+// Request Logger
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
@@ -39,16 +38,15 @@ app.use((req, res, next) => {
 
 // Routes
 
-// 1. Health Check (Useful for deployment platforms)
+// 1. Health Check - Critical for Railway
 app.get('/', (req, res) => {
-  res.send('ChefNote API Server is running.');
+  res.status(200).send('ChefNote API Server is running.');
 });
 
 // 2. Get All Recipes
 app.get('/api/recipes', (req, res) => {
   try {
     const recipes = db.get('recipes').value();
-    // Sort by createdAt desc
     const sorted = [...recipes].sort((a: any, b: any) => b.createdAt - a.createdAt);
     res.json(sorted);
   } catch (error) {
@@ -61,13 +59,10 @@ app.get('/api/recipes', (req, res) => {
 app.post('/api/recipes', (req, res) => {
   try {
     const newRecipe = req.body;
-    
-    // Simple validation
     if (!newRecipe.title || !newRecipe.id) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
-
     db.get('recipes').unshift(newRecipe).write();
     res.status(201).json(newRecipe);
   } catch (error) {
@@ -81,16 +76,13 @@ app.put('/api/recipes/:id', (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-
     const existing = db.get('recipes').find({ id }).value();
     if (!existing) {
       res.status(404).json({ error: 'Recipe not found' });
       return;
     }
-
     db.get('recipes').find({ id }).assign(updates).write();
     const updated = db.get('recipes').find({ id }).value();
-    
     res.json(updated);
   } catch (error) {
     console.error('Error updating recipe:', error);
@@ -112,12 +104,10 @@ app.get('/api/categories', (req, res) => {
 app.put('/api/categories', (req, res) => {
   try {
     const newCategories = req.body;
-    
     if (!Array.isArray(newCategories)) {
       res.status(400).json({ error: 'Categories must be an array' });
       return;
     }
-
     db.set('categories', newCategories).write();
     res.json(newCategories);
   } catch (error) {
@@ -127,7 +117,6 @@ app.put('/api/categories', (req, res) => {
 
 // --- AI Routes ---
 
-// 7. Generate Menu Theme
 app.post('/api/ai/generate-menu', async (req, res) => {
     if (!ai) {
         res.status(503).json({ error: 'Server API Key not configured' });
@@ -136,7 +125,6 @@ app.post('/api/ai/generate-menu', async (req, res) => {
     try {
         console.log('AI Request: Generate Menu');
         const { recipes, selectedIds } = req.body;
-        // Add safety check
         if (!recipes || !selectedIds) {
              res.status(400).json({ error: 'Missing recipes or selectedIds' });
              return;
@@ -152,7 +140,6 @@ app.post('/api/ai/generate-menu', async (req, res) => {
             Please generate a sophisticated, high-end Chinese banquet menu theme.
         `;
 
-        // Use 'gemini-3-flash-preview' for better creative text generation
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview', 
             contents: prompt,
@@ -161,40 +148,24 @@ app.post('/api/ai/generate-menu', async (req, res) => {
                 responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    title: { 
-                    type: Type.STRING, 
-                    description: "String (e.g. '甲辰年·中秋家宴', '立冬·暖心私宴')" 
-                    },
-                    description: { 
-                    type: Type.STRING, 
-                    description: "String (Poetic description, max 15 words)" 
-                    },
-                    idiom: { 
-                    type: Type.STRING, 
-                    description: "String (3-4 characters representing the season/mood, e.g. '秋意浓', '春日宴')" 
-                    },
-                    themeColor: { 
-                    type: Type.STRING, 
-                    description: "String (One of: 'red', 'orange', 'green', 'blue', 'neutral')" 
-                    }
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    idiom: { type: Type.STRING },
+                    themeColor: { type: Type.STRING }
                 },
                 required: ["title", "description", "idiom", "themeColor"]
                 }
             }
         });
-
         const json = JSON.parse(response.text || '{}');
         res.json(json);
     } catch (error: any) {
         console.error('AI Generate Menu Error:', error);
-        // Better error handling
         const errorMessage = error.message || 'Failed to generate menu';
-        const status = errorMessage.includes('quota') ? 429 : 500;
-        res.status(status).json({ error: errorMessage });
+        res.status(500).json({ error: errorMessage });
     }
 });
 
-// 8. Generate Prep List
 app.post('/api/ai/generate-prep', async (req, res) => {
     if (!ai) {
         res.status(503).json({ error: 'Server API Key not configured' });
@@ -207,38 +178,46 @@ app.post('/api/ai/generate-prep', async (req, res) => {
              res.status(400).json({ error: 'Missing recipes or selectedIds' });
              return;
         }
-
         const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
         const ingredientsData = selectedRecipes.map((r: any) => 
             `${r.title}: ${r.ingredients.map((i: any) => `${i.name} (${i.amount})`).join(', ')}`
         ).join('\n');
       
         const prompt = `
-          Based on these dishes and ingredients:
-          ${ingredientsData}
-          
-          Generate a consolidated shopping/prep list. 
-          Combine same ingredients. 
-          Format as a simple checklist.
+          Based on these dishes: ${ingredientsData}
+          Generate a consolidated shopping/prep list.
         `;
 
-        // Use 'gemini-3-flash-preview' for general text tasks
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
         });
-
         res.json({ text: response.text });
     } catch (error: any) {
         console.error('AI Generate Prep Error:', error);
-        // Better error handling
-        const errorMessage = error.message || 'Failed to generate prep list';
-        const status = errorMessage.includes('quota') ? 429 : 500;
-        res.status(status).json({ error: errorMessage });
+        res.status(500).json({ error: error.message || 'Failed to generate prep list' });
     }
 });
 
-// Start Server
-app.listen(PORT, '0.0.0.0', () => {
+// Start Server with Graceful Shutdown
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Health check available at http://0.0.0.0:${PORT}/`);
+});
+
+// Handle SIGTERM (Railway/Docker stop signal)
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
 });
