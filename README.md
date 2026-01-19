@@ -1,11 +1,37 @@
-<div align="center">
+# ChefNote
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+这是一个全栈菜谱管理应用。
 
-  <h1>Built with AI Studio</h2>
+## 🚀 快速开始 (如何运行)
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+本项目分为前端和后端两个部分，需要分别启动。
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+### 1. 启动后端 API 服务
+后端负责数据存储 (使用本地 JSON 文件)。
 
-</div>
+```bash
+cd server
+npm install
+npm start
+```
+> 后端服务将运行在 `http://localhost:3001`
+
+### 2. 启动前端应用
+请**新建一个终端窗口**，在项目根目录下运行：
+
+```bash
+npm install
+npm run dev
+```
+
+前端会自动通过代理连接到后端服务。
+
+## ✨ 功能特性
+
+- **瀑布流展示**: 精美的菜谱卡片展示
+- **完整 CRUD**: 支持添加、编辑、删除菜谱
+- **点菜模式**: 像在餐厅一样点菜，生成精美菜单卡片
+- **AI 赋能**: 
+  - 自动生成备菜清单 (Gemini)
+  - 自动生成具有文化韵味的菜单主题 (Gemini)
+- **本地存储**: 数据保存在 `db.json` 中，方便迁移备份

@@ -1,0 +1,7 @@
+{
+  "name": "ChefNote",
+  "description": "A personal iOS-style recipe management app with waterfall layout, ordering mode, and AI menu generation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "ChefNote",
+  "short_name": "ChefNote",
+  "description": "个人菜谱与菜单管理助手",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f4f6",
+  "theme_color": "#ffffff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ]
+}
