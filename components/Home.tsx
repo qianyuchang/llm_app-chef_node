@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, UtensilsCrossed, Clock, ChevronRight, Flame } from 'lucide-react';
+import { Search, UtensilsCrossed, Flame, Sparkles } from 'lucide-react';
 import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 
@@ -20,39 +20,53 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
     return matchesCategory && matchesSearch;
   });
 
+  // Calculate stats
+  const masterScore = recipes.reduce((acc, r) => acc + (r.logs ? r.logs.length : 0), 0);
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-5 pt-6 pb-2 bg-white sticky top-0 z-10 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] rounded-b-3xl">
-        <h1 className="text-xl font-bold text-center mb-4 text-[#1a472a] tracking-tight">ChefNote</h1>
+    <div className="flex flex-col h-full bg-[#f2f4f6]">
+      {/* Header Area */}
+      <div className="px-6 pt-2 pb-2 bg-[#f2f4f6] sticky top-0 z-10">
         
-        <div className="flex gap-3 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+        {/* App Title (Restored) */}
+        <h1 className="text-[17px] font-bold text-center py-3 text-[#1a472a] tracking-tight">ChefNote</h1>
+
+        {/* Search Bar & Order Button Row (Resized & Compact) */}
+        <div className="flex gap-3 mb-5 items-center">
+          <div className="flex-1 relative shadow-sm rounded-full group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-[#385c44] transition-colors" />
             <input 
               type="text"
               placeholder="今天想吃什么？"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-50/80 rounded-2xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a472a]/10 transition-all placeholder:text-gray-400"
+              className="w-full pl-10 pr-4 py-3 bg-white rounded-full text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#385c44]/10 transition-all placeholder:text-gray-400"
             />
           </div>
           <button 
             onClick={onOrderModeClick}
-            className="w-11 h-11 bg-[#1a472a] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-900/20 active:scale-95 transition-all"
+            className="w-[46px] h-[46px] bg-[#385c44] rounded-full flex items-center justify-center text-white shadow-xl shadow-[#385c44]/20 active:scale-95 transition-all flex-shrink-0"
           >
-            <UtensilsCrossed size={18} />
+            <UtensilsCrossed size={20} strokeWidth={2.5} />
           </button>
         </div>
 
+        {/* Title Section (Spacing Reduced) */}
+        <div className="mb-6 px-1">
+            <h2 className="text-[28px] font-bold text-[#1f1f1f] leading-tight mb-1.5 tracking-tight">我的厨房日记</h2>
+            <p className="text-[13px] text-gray-400 font-normal tracking-wide">
+                已收录 {recipes.length} 道美味，大师之路 {masterScore}
+            </p>
+        </div>
+
         {/* Categories */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 -mx-5 px-5">
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
           <button
             onClick={() => setActiveCategory('全部')}
-            className={`px-4 py-1.5 rounded-full whitespace-nowrap text-xs font-medium transition-all duration-300 ${
+            className={`px-5 py-2 rounded-full whitespace-nowrap text-[13px] font-bold transition-all duration-300 ${
               activeCategory === '全部' 
-                ? 'bg-[#1a472a] text-white shadow-md shadow-green-900/10' 
-                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                ? 'bg-[#385c44] text-white shadow-lg shadow-[#385c44]/20' 
+                : 'bg-white text-gray-600 shadow-sm hover:bg-gray-50'
             }`}
           >
             全部
@@ -61,10 +75,10 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-1.5 rounded-full whitespace-nowrap text-xs font-medium transition-all duration-300 ${
+              className={`px-5 py-2 rounded-full whitespace-nowrap text-[13px] font-bold transition-all duration-300 ${
                 activeCategory === cat 
-                  ? 'bg-[#1a472a] text-white shadow-md shadow-green-900/10' 
-                  : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  ? 'bg-[#385c44] text-white shadow-lg shadow-[#385c44]/20' 
+                  : 'bg-white text-gray-600 shadow-sm hover:bg-gray-50'
               }`}
             >
               {cat}
@@ -74,57 +88,62 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
       </div>
 
       {/* Masonry Grid */}
-      <div className="p-4 flex-1 overflow-y-auto no-scrollbar pb-32">
-        <div className="columns-2 gap-4 space-y-4">
-          {filteredRecipes.map(recipe => (
-            <div 
-              key={recipe.id} 
-              onClick={() => onRecipeClick(recipe)}
-              className="break-inside-avoid bg-white rounded-[20px] overflow-hidden shadow-[0_5px_15px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all duration-300 active:scale-[0.98] group cursor-pointer"
-            >
-              <div className="relative">
-                <img 
-                  src={recipe.coverImage} 
-                  alt={recipe.title} 
-                  className="w-full object-cover"
-                  style={{ aspectRatio: '3/4' }} 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Proficiency Badge on Image */}
-                <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-lg border border-white/20">
-                   <span className="text-[10px] text-white font-medium tracking-wide">
-                     {PROFICIENCY_TEXT[recipe.proficiency]}
-                   </span>
-                </div>
-              </div>
-              
-              <div className="p-3.5">
-                <h3 className="font-bold text-gray-800 text-[15px] leading-tight mb-2">{recipe.title}</h3>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                    {recipe.category}
-                  </span>
+      <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
+        {filteredRecipes.length > 0 ? (
+          <div className="columns-2 gap-4 space-y-4">
+            {filteredRecipes.map(recipe => (
+              <div 
+                key={recipe.id} 
+                onClick={() => onRecipeClick(recipe)}
+                className="break-inside-avoid bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] transition-all duration-300 active:scale-[0.98] group cursor-pointer border border-gray-100/50"
+              >
+                <div className="relative">
+                  <img 
+                    src={recipe.coverImage} 
+                    alt={recipe.title} 
+                    className="w-full object-cover bg-gray-50"
+                    style={{ aspectRatio: '3/4' }} 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   
-                  {/* Cooking Count */}
+                  {/* Proficiency Badge */}
+                  <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full shadow-sm">
+                     <span className="text-[10px] text-[#385c44] font-bold tracking-wide">
+                       {PROFICIENCY_TEXT[recipe.proficiency]}
+                     </span>
+                  </div>
+
+                  {/* Cooking Count Overlay */}
                   {recipe.logs && recipe.logs.length > 0 && (
-                      <div className="flex items-center gap-1 text-[10px] text-orange-500 font-medium bg-orange-50 px-1.5 py-0.5 rounded-md">
-                          <Flame size={10} fill="currentColor" />
-                          {recipe.logs.length}次
+                      <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10">
+                          <Flame size={10} fill="currentColor" className="text-orange-400" />
+                          {recipe.logs.length}
                       </div>
                   )}
                 </div>
+                
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+                      {recipe.category}
+                    </span>
+                  </div>
+                </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          /* Empty State */
+          <div className="flex flex-col items-center justify-center pt-24 text-center px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm">
+                <Sparkles size={32} className="text-[#385c44]/40" />
             </div>
-          ))}
-        </div>
-        
-        {/* Empty State */}
-        {filteredRecipes.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <Search size={48} strokeWidth={1} className="mb-4 opacity-20" />
-            <p className="text-sm">没有找到相关菜谱</p>
+            <h3 className="text-lg font-bold text-gray-800 mb-3">没有找到相关菜谱</h3>
+            <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
+              也许它正等着你亲自下厨<br />
+              <span className="text-[#385c44] font-medium mt-1 inline-block">去创造第一个定义美味的人吧！</span>
+            </p>
           </div>
         )}
       </div>
