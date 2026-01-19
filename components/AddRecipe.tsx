@@ -323,6 +323,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                 aspect={3/4} // Standard recipe card aspect ratio
             />
         )}
+      </div>
     </div>
   );
 };

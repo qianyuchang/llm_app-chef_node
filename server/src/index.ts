@@ -7,7 +7,7 @@ const PORT = 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increase limit for Base64 images
+app.use(express.json({ limit: '50mb' }) as any); // Increase limit for Base64 images
 
 // Routes
 
