@@ -17,13 +17,13 @@ interface RecipeDetailProps {
 const getSourceInfo = (url: string) => {
   const lowerUrl = url.toLowerCase();
   if (lowerUrl.includes('xiaohongshu') || lowerUrl.includes('xhslink')) {
-    return { name: '小红书', color: 'text-red-500', bg: 'bg-red-50', icon: <span className="font-bold text-xs">小红书</span> };
+    return { name: '小红书', color: 'text-red-500', bg: 'bg-red-50', icon: <span className="font-bold text-xs leading-none">小红书</span> };
   }
   if (lowerUrl.includes('bilibili')) {
-    return { name: '哔哩哔哩', color: 'text-pink-400', bg: 'bg-pink-50', icon: <span className="font-bold text-xs">B站</span> };
+    return { name: '哔哩哔哩', color: 'text-pink-400', bg: 'bg-pink-50', icon: <span className="font-bold text-xs leading-none">B站</span> };
   }
   if (lowerUrl.includes('douyin')) {
-    return { name: '抖音', color: 'text-black', bg: 'bg-gray-100', icon: <span className="font-bold text-xs">抖音</span> };
+    return { name: '抖音', color: 'text-black', bg: 'bg-gray-100', icon: <span className="font-bold text-xs leading-none">抖音</span> };
   }
   if (lowerUrl.includes('youtube')) {
     return { name: 'YouTube', color: 'text-red-600', bg: 'bg-red-50', icon: <Youtube size={16} /> };
@@ -156,18 +156,18 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
             {/* Title & Stats */}
             <div className="mb-8">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="px-3 py-1 rounded-full bg-[#f0fdf4] text-[#1a472a] text-xs font-bold tracking-wide shadow-sm border border-[#1a472a]/10">
-                        {recipe.category}
-                    </span>
+                    <div className="px-3 py-1 rounded-full bg-[#f0fdf4] text-[#1a472a] text-xs font-bold tracking-wide shadow-sm border border-[#1a472a]/10 flex items-center justify-center leading-none">
+                        <span className="pt-[1px]">{recipe.category}</span>
+                    </div>
                     {sourceInfo && recipe.sourceLink && (
                         <a 
                             href={recipe.sourceLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${sourceInfo.bg} ${sourceInfo.color} text-xs font-medium hover:opacity-80 transition-opacity`}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${sourceInfo.bg} ${sourceInfo.color} text-xs font-medium hover:opacity-80 transition-opacity leading-none`}
                         >
                             {sourceInfo.icon}
-                            <span>来源</span>
+                            <span className="pt-[1px]">来源</span>
                         </a>
                     )}
                 </div>

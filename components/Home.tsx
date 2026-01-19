@@ -106,9 +106,9 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   
-                  {/* Proficiency Badge */}
-                  <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full shadow-sm">
-                     <span className="text-[10px] text-[#385c44] font-bold tracking-wide">
+                  {/* Proficiency Badge - Fixed for Mobile alignment */}
+                  <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center">
+                     <span className="text-[10px] text-[#385c44] font-bold tracking-wide leading-none pt-[1px]">
                        {PROFICIENCY_TEXT[recipe.proficiency]}
                      </span>
                   </div>

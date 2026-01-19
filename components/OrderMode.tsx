@@ -33,6 +33,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const [showAiModal, setShowAiModal] = useState(false);
   const [peopleCount, setPeopleCount] = useState(2);
   const [isRecommending, setIsRecommending] = useState(false);
+  const [aiLoadingText, setAiLoadingText] = useState('思考中...');
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -60,6 +61,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   // --- AI Logic ---
   const handleAiRecommendation = async () => {
       setIsRecommending(true);
+      setAiLoadingText('思考中...');
       try {
           // 1. Get Recommendations
           const result = await recommendMenu(recipes, peopleCount);
@@ -71,16 +73,19 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
               });
               setCart(newCart);
               
+              setAiLoadingText('生成海报中...');
+
               // 3. Auto-generate Menu Theme (Poster)
               try {
                  const themeResult = await generateMenuTheme(recipes, result.selectedIds);
                  setMenuTheme(themeResult);
               } catch (themeError) {
                  console.error("Theme generation failed", themeError);
-                 // Proceed even if theme generation fails, just to show the cart update
+                 if (onShowToast) onShowToast("海报生成失败，但菜品已选择", 'error');
               }
 
               setShowAiModal(false);
+              // Only toast success if we are showing the poster, or just a generic success
               if (onShowToast) onShowToast(result.reasoning || "已为您生成菜单", 'success');
           }
       } catch (error) {
@@ -304,10 +309,10 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                             <div className="flex-1 flex flex-col justify-between py-1">
                                 <div>
                                     <h3 className={`font-bold text-sm ${selected ? 'text-[#1a472a]' : 'text-gray-800'}`}>{recipe.title}</h3>
-                                    {/* Mock tags */}
+                                    {/* Mock tags - Fixed vertical alignment */}
                                     <div className="flex gap-1 mt-1.5">
-                                        <span className="text-[10px] bg-white text-gray-400 px-1.5 py-0.5 rounded-md border border-gray-100">
-                                        {recipe.category}
+                                        <span className="inline-flex items-center justify-center text-[10px] bg-white text-gray-400 px-1.5 py-0.5 rounded-md border border-gray-100 leading-none">
+                                            <span className="pt-[1px]">{recipe.category}</span>
                                         </span>
                                     </div>
                                 </div>
@@ -405,7 +410,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                             >
                                 -
                             </button>
-                            <span className="text-xl font-bold min-w-[2rem] text-center text-gray-900">{peopleCount}</span>
+                            <span className="text-xl font-bold min-w-[2rem] text-center text-black">{peopleCount}</span>
                             <button 
                                 onClick={() => setPeopleCount(Math.min(20, peopleCount + 1))}
                                 className="w-8 h-8 rounded-full bg-[#1a472a] text-white flex items-center justify-center font-bold active:scale-90 transition-transform shadow-sm"
@@ -431,7 +436,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                         {isRecommending ? (
                             <>
                                 <Sparkles size={16} className="animate-spin" />
-                                思考中...
+                                {aiLoadingText}
                             </>
                         ) : (
                             <>
