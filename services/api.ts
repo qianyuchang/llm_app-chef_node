@@ -1,8 +1,9 @@
 import { Recipe } from '../types';
 
-// Use absolute URL to ensure connectivity in dev, preview, and production.
-// This bypasses the Vite proxy and connects directly to the backend.
-export const API_BASE_URL = 'https://llmapp-chefnode-production.up.railway.app/api';
+// Use relative URL.
+// In production, the frontend is served by the backend, so /api works perfectly regardless of the domain.
+// In development, Vite proxy forwards /api to the backend.
+export const API_BASE_URL = '/api';
 
 export const api = {
   getRecipes: async (): Promise<Recipe[]> => {

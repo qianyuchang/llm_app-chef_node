@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: 'https://llmapp-chefnode-production.up.railway.app',
+          target: 'http://localhost:3001', // Default to local backend for development
           changeOrigin: true,
           secure: false,
         }

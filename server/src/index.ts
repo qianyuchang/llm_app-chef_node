@@ -224,7 +224,7 @@ if (!fs.existsSync(staticPath)) {
 app.use(express.static(staticPath));
 
 // Handle React Routing, return all requests to React app
-app.get('*', (req: express.Request, res: express.Response) => {
+app.get('*', (req, res) => {
     if (fs.existsSync(path.join(staticPath, 'index.html'))) {
       res.sendFile(path.join(staticPath, 'index.html'));
     } else {
