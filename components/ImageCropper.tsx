@@ -1,7 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 import { Check, X } from 'lucide-react';
-import { Point, Area } from 'react-easy-crop/types';
+
+// Define types locally to avoid import issues with esm.sh
+type Point = { x: number; y: number };
+type Area = { width: number; height: number; x: number; y: number };
 
 interface ImageCropperProps {
   imageSrc: string;
@@ -124,7 +127,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           </button>
       </div>
       
-      <div className="relative flex-1 bg-black">
+      <div className="relative flex-1 bg-black w-full h-full">
         <Cropper
           image={imageSrc}
           crop={crop}
