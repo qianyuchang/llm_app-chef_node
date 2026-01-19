@@ -94,6 +94,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleRenameCategory = async (oldName: string, newName: string) => {
+    try {
+      // 1. Update Category List
+      const newCategoryList = categories.map(c => c === oldName ? newName : c);
+      await api.updateCategories(newCategoryList);
+      setCategories(newCategoryList);
+
+      // 2. Find and Update all recipes that belong to this category
+      const recipesToUpdate = recipes.filter(r => r.category === oldName);
+      
+      // Update them one by one (in a real backend, this might be a batch operation)
+      await Promise.all(recipesToUpdate.map(async (recipe) => {
+        const updated = { ...recipe, category: newName };
+        await api.updateRecipe(updated);
+        return updated;
+      }));
+
+      // 3. Update local state
+      setRecipes(prev => prev.map(r => r.category === oldName ? { ...r, category: newName } : r));
+      
+      showToast('分类重命名成功');
+    } catch (error) {
+      console.error('Failed to rename category:', error);
+      showToast('重命名失败', 'error');
+      throw error;
+    }
+  };
+
   const handleRecipeClick = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setCurrentView('RECIPE_DETAIL');
@@ -153,6 +181,7 @@ const App: React.FC = () => {
           <CategoryManager 
             categories={categories}
             onUpdateCategories={handleUpdateCategories}
+            onRenameCategory={handleRenameCategory}
             onBack={() => setCurrentView('HOME')}
           />
         );

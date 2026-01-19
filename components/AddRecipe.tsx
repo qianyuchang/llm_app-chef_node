@@ -331,6 +331,19 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                 </div>
             </div>
         </div>
+
+        {/* Bottom Action Button for Long Forms */}
+        <div className="px-2 mt-6 mb-8">
+            <Button 
+                onClick={handleSave} 
+                variant="primary"
+                isLoading={isSaving}
+                fullWidth
+                className="py-4 text-base shadow-xl shadow-green-900/10"
+            >
+                保存菜谱
+            </Button>
+        </div>
         
         {/* Image Cropper Modal */}
         {isCropping && tempImage && (

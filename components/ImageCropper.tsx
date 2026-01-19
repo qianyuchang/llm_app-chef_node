@@ -101,8 +101,19 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     }
   };
 
+  // Prevent touch events from bubbling up to parent swipe handlers
+  const stopPropagation = (e: React.TouchEvent | React.MouseEvent) => {
+      e.stopPropagation();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div 
+        className="fixed inset-0 z-50 bg-black flex flex-col"
+        onTouchStart={stopPropagation}
+        onTouchMove={stopPropagation}
+        onTouchEnd={stopPropagation}
+        onClick={stopPropagation}
+    >
       <div className="flex justify-between items-center p-4 z-10 bg-black/50 backdrop-blur-sm text-white absolute top-0 left-0 right-0">
           <button onClick={onCancel} className="p-2">
             <X size={24} />

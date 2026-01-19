@@ -5,10 +5,11 @@ import { useSwipe } from '../hooks/useSwipe';
 interface CategoryManagerProps {
   categories: string[];
   onUpdateCategories: (categories: string[]) => Promise<void>;
+  onRenameCategory: (oldName: string, newName: string) => Promise<void>;
   onBack: () => void;
 }
 
-export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onUpdateCategories, onBack }) => {
+export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onUpdateCategories, onRenameCategory, onBack }) => {
   const [newCategory, setNewCategory] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -59,17 +60,21 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   };
 
   const saveEdit = async (index: number) => {
-    if (!editValue.trim()) return;
-    if (categories.includes(editValue.trim()) && categories[index] !== editValue.trim()) {
+    const trimmedNewName = editValue.trim();
+    const oldName = categories[index];
+
+    if (!trimmedNewName) return;
+    if (categories.includes(trimmedNewName) && oldName !== trimmedNewName) {
       alert('分类已存在');
       return;
     }
     
     setIsProcessing(true);
-    const newCats = [...categories];
-    newCats[index] = editValue.trim();
     try {
-        await onUpdateCategories(newCats);
+        if (oldName !== trimmedNewName) {
+            // Use specific rename function to update recipes as well
+            await onRenameCategory(oldName, trimmedNewName);
+        }
         setEditingIndex(null);
     } catch (e) {
         // Error handled

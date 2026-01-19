@@ -123,6 +123,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       }
   };
 
+  const openSourceLink = () => {
+    if (!recipe.sourceLink) return;
+    // Using window.open instead of <a target="_blank"> helps in PWA standalone mode on iOS
+    // to force opening in Safari rather than an embedded white screen
+    window.open(recipe.sourceLink, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden" {...swipeHandlers}>
       {/* Sticky Header */}
@@ -160,15 +167,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                         {recipe.category}
                     </span>
                     {sourceInfo && recipe.sourceLink && (
-                        <a 
-                            href={recipe.sourceLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button 
+                            onClick={openSourceLink}
                             className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${sourceInfo.bg} ${sourceInfo.color} text-xs font-medium hover:opacity-80 transition-opacity`}
                         >
                             {sourceInfo.icon}
                             <span>来源</span>
-                        </a>
+                        </button>
                     )}
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2 leading-tight">{recipe.title}</h1>
@@ -281,15 +286,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
             </div>
             
             {recipe.sourceLink && (
-                 <a 
-                    href={recipe.sourceLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                 <button 
+                    onClick={openSourceLink}
                     className="flex items-center justify-center gap-2 w-full py-4 bg-gray-50 text-center text-gray-500 text-sm rounded-xl hover:bg-gray-100 transition-colors border border-gray-100 mb-8"
                 >
                     <ExternalLink size={16} />
                     查看原教程
-                </a>
+                </button>
             )}
         </div>
 
