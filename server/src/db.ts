@@ -1,6 +1,7 @@
 import low from 'lowdb';
 import FileSync from 'lowdb/adapters/FileSync';
 import path from 'path';
+import fs from 'fs';
 
 // Define the shape of our database
 interface Recipe {
@@ -48,7 +49,16 @@ const MOCK_RECIPES: Recipe[] = [
   }
 ];
 
-const adapter = new FileSync<DatabaseSchema>(path.join(__dirname, '../../db.json'));
+// DETERMINE DB PATH
+// If RAILWAY_VOLUME_MOUNT_PATH is set (Production), use that.
+// Otherwise use local file path.
+const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
+  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json')
+  : path.join(__dirname, '../../db.json');
+
+console.log(`Using database file at: ${dbPath}`);
+
+const adapter = new FileSync<DatabaseSchema>(dbPath);
 const db = (low as any)(adapter);
 
 // Initialize with defaults if empty

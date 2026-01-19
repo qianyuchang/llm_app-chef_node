@@ -142,6 +142,7 @@ const App: React.FC = () => {
             recipes={recipes}
             categories={categories}
             onBack={() => setCurrentView('HOME')} 
+            onShowToast={showToast}
           />
         );
       case 'CATEGORY_MANAGER':

@@ -3,11 +3,13 @@ import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCirc
 import { toPng } from 'html-to-image';
 import { Recipe } from '../types';
 import { generatePrepList, generateMenuTheme } from '../services/geminiService';
+import { ToastType } from './Toast';
 
 interface OrderModeProps {
   recipes: Recipe[];
   categories: string[];
   onBack: () => void;
+  onShowToast?: (message: string, type: ToastType) => void;
 }
 
 const COURSE_ORDER = ['前菜', '汤羹', '热菜', '主食', '甜品', '其他'];
@@ -28,7 +30,7 @@ interface MenuThemeData {
   themeColor: string;
 }
 
-export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBack }) => {
+export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBack, onShowToast }) => {
   const [activeCategory, setActiveCategory] = useState<string>('全部');
   // Use a Set-like logic for selection. Value 1 means selected, 0 means not.
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -60,17 +62,29 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const handleGenerateMenu = async () => {
     if (totalItems === 0) return;
     setIsGenerating(true);
-    const result = await generateMenuTheme(recipes, selectedRecipeIds);
-    setMenuTheme(result);
-    setIsGenerating(false);
+    try {
+        const result = await generateMenuTheme(recipes, selectedRecipeIds);
+        setMenuTheme(result);
+    } catch (error) {
+        if (onShowToast) onShowToast("生成失败: " + (error as Error).message, 'error');
+        console.error(error);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   const handlePrepList = async () => {
     if (totalItems === 0) return;
     setIsGenerating(true);
-    const result = await generatePrepList(recipes, selectedRecipeIds);
-    setPrepResult(result || '');
-    setIsGenerating(false);
+    try {
+        const result = await generatePrepList(recipes, selectedRecipeIds);
+        setPrepResult(result || '');
+    } catch (error) {
+        if (onShowToast) onShowToast("生成失败: " + (error as Error).message, 'error');
+        console.error(error);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   const downloadMenu = () => {
@@ -87,6 +101,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
       })
       .catch((err) => {
         console.error('oops, something went wrong!', err);
+        if (onShowToast) onShowToast("保存图片失败", 'error');
       });
   };
 
