@@ -4,11 +4,13 @@ import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
 import { ToastType } from './Toast';
+import { Button } from './Button';
+import { useSwipe } from '../hooks/useSwipe';
 
 interface AddRecipeProps {
   categories: string[];
   onBack: () => void;
-  onSave: (recipe: Omit<Recipe, 'id' | 'createdAt'> | Recipe) => void;
+  onSave: (recipe: Omit<Recipe, 'id' | 'createdAt'> | Recipe) => Promise<void>;
   initialData?: Recipe | null;
   onShowToast: (message: string, type: ToastType) => void;
 }
@@ -25,6 +27,12 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
   // Cropper State
   const [tempImage, setTempImage] = useState<string | null>(null);
   const [isCropping, setIsCropping] = useState(false);
+  
+  // Loading State
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Swipe Handler
+  const swipeHandlers = useSwipe(onBack);
 
   useEffect(() => {
     if (initialData) {
@@ -72,7 +80,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
     setSteps(newSteps);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // 1. Validate Title
     if (!title.trim()) {
         onShowToast("请输入菜名", 'error');
@@ -82,16 +90,18 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
     // 2. Validate Ingredients
     const validIngredients = ingredients.filter(i => i.name.trim());
     if (validIngredients.length === 0) {
-        onShowToast("请至少填写一项食材（名称必填）", 'error');
+        onShowToast("请至少填写一项食材", 'error');
         return;
     }
 
     // 3. Validate Steps
     const validSteps = steps.filter(s => s.trim());
     if (validSteps.length === 0) {
-        onShowToast("请至少填写一个烹饪步骤", 'error');
+        onShowToast("请至少填写一个步骤", 'error');
         return;
     }
+
+    setIsSaving(true);
 
     const recipeData = {
       title: title.trim(),
@@ -103,33 +113,44 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
       steps: validSteps
     };
 
-    if (initialData) {
-      onSave({ 
-        ...recipeData, 
-        id: initialData.id, 
-        createdAt: initialData.createdAt,
-        logs: initialData.logs 
-      });
-    } else {
-      onSave({
-        ...recipeData,
-        logs: []
-      });
+    try {
+      if (initialData) {
+        await onSave({ 
+          ...recipeData, 
+          id: initialData.id, 
+          createdAt: initialData.createdAt,
+          logs: initialData.logs 
+        });
+      } else {
+        await onSave({
+          ...recipeData,
+          logs: []
+        });
+      }
+    } catch (error) {
+      setIsSaving(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f2f4f6] pb-10">
+    <div className="flex flex-col h-full bg-[#f2f4f6] pb-10" {...swipeHandlers}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 sticky top-0 bg-white z-20 shadow-sm">
-        <button onClick={onBack} className="flex items-center text-gray-600 text-sm hover:text-gray-900 transition-colors">
+        <button onClick={onBack} disabled={isSaving} className="flex items-center text-gray-600 text-sm hover:text-gray-900 transition-colors disabled:opacity-50">
           <ChevronLeft size={20} />
           返回
         </button>
         <h1 className="text-lg font-bold text-gray-800">{initialData ? '编辑菜谱' : '记录新菜'}</h1>
-        <button onClick={handleSave} className="text-[#1a472a] font-bold text-sm bg-green-50 px-3 py-1.5 rounded-full hover:bg-green-100 transition-colors">
-          保存
-        </button>
+        <div className="w-16 flex justify-end">
+            <Button 
+              onClick={handleSave} 
+              variant="primary"
+              isLoading={isSaving}
+              className="text-xs px-3 py-1.5 min-w-[3.5rem]"
+            >
+              保存
+            </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-6 space-y-6">
@@ -320,7 +341,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                     setIsCropping(false);
                     setTempImage(null);
                 }}
-                aspect={3/4} // Standard recipe card aspect ratio
+                aspect={3/4}
             />
         )}
       </div>

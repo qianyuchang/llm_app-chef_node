@@ -8,7 +8,7 @@ import { Recipe } from '../types';
 // 1. 本地开发 (Local): 保持为 'http://localhost:3001/api'
 // 2. 生产环境 (Production): 部署前端前，请将此处修改为你的后端真实域名
 //
-export const API_BASE_URL = 'http://localhost:3001/api';
+export const API_BASE_URL = 'https://llmapp-chefnode-production.up.railway.app/api';
 
 export const api = {
   getRecipes: async (): Promise<Recipe[]> => {

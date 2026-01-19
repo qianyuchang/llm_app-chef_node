@@ -4,6 +4,7 @@ import { toPng } from 'html-to-image';
 import { Recipe } from '../types';
 import { generatePrepList, generateMenuTheme } from '../services/geminiService';
 import { ToastType } from './Toast';
+import { useSwipe } from '../hooks/useSwipe';
 
 interface OrderModeProps {
   recipes: Recipe[];
@@ -38,6 +39,9 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const [prepResult, setPrepResult] = useState<string | null>(null);
   const [menuTheme, setMenuTheme] = useState<MenuThemeData | null>(null);
   const menuCardRef = useRef<HTMLDivElement>(null);
+
+  // Swipe Handler
+  const swipeHandlers = useSwipe(onBack);
 
   const isSelected = (id: string): boolean => {
     return !!cart[id];
@@ -164,7 +168,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const themeStyles = menuTheme ? getThemeStyles(menuTheme.themeColor) : getThemeStyles('neutral');
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className="flex flex-col h-full bg-white relative" {...swipeHandlers}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 sticky top-0 bg-white z-20">
         <button onClick={onBack} className="p-1 hover:bg-gray-100 rounded-full transition-colors">

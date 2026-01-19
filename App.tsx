@@ -58,6 +58,7 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Failed to update recipe:', error);
         showToast('保存失败: ' + (error as Error).message, 'error');
+        throw error; // Re-throw so child component can stop loading
       }
     } else {
       // Creating new recipe
@@ -76,6 +77,7 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Failed to create recipe:', error);
         showToast('创建失败: ' + (error as Error).message, 'error');
+        throw error; // Re-throw so child component can stop loading
       }
     }
   };
@@ -88,6 +90,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Failed to update categories:', error);
       showToast('分类更新失败', 'error');
+      throw error;
     }
   };
 

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check } from 'lucide-react';
+import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import { Recipe, CookingLog } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
 import { ToastType } from './Toast';
+import { useSwipe } from '../hooks/useSwipe';
 
 interface RecipeDetailProps {
   recipe: Recipe;
   onBack: () => void;
   onEdit: (recipe: Recipe) => void;
-  onUpdate: (recipe: Recipe) => void;
+  onUpdate: (recipe: Recipe) => Promise<void>;
   onShowToast: (message: string, type: ToastType) => void;
 }
 
@@ -40,6 +41,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
   const [tempImage, setTempImage] = useState<string | null>(null);
   const [isCropping, setIsCropping] = useState(false);
 
+  // Loading State
+  const [isSaving, setIsSaving] = useState(false);
+  const [processingLogId, setProcessingLogId] = useState<string | null>(null); // For individual log deletion/cover set
+
+  // Swipe Handler
+  const swipeHandlers = useSwipe(onBack);
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -59,12 +67,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
     setTempImage(null);
   };
 
-  const handleSaveLog = () => {
+  const handleSaveLog = async () => {
     if (!newLogImage && !newLogNote.trim()) {
         onShowToast("请上传成品图或填写心得", 'error');
         return;
     }
 
+    setIsSaving(true);
     const newLog: CookingLog = {
       id: Date.now().toString(),
       date: Date.now(),
@@ -77,25 +86,45 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       logs: [newLog, ...(recipe.logs || [])] // Prepend new log
     };
 
-    onUpdate(updatedRecipe);
-    setShowLogModal(false);
-    setNewLogImage(null);
-    setNewLogNote('');
-  };
-
-  const handleDeleteLog = (logId: string) => {
-    if (confirm('确定要删除这条记录吗？')) {
-      const updatedLogs = recipe.logs.filter(l => l.id !== logId);
-      onUpdate({ ...recipe, logs: updatedLogs });
+    try {
+        await onUpdate(updatedRecipe);
+        setShowLogModal(false);
+        setNewLogImage(null);
+        setNewLogNote('');
+    } catch (e) {
+        // Error handled in App.tsx
+    } finally {
+        setIsSaving(false);
     }
   };
 
-  const handleSetCover = (imgUrl: string) => {
-      onUpdate({...recipe, coverImage: imgUrl});
+  const handleDeleteLog = async (logId: string) => {
+    if (confirm('确定要删除这条记录吗？')) {
+      setProcessingLogId(logId);
+      const updatedLogs = recipe.logs.filter(l => l.id !== logId);
+      try {
+        await onUpdate({ ...recipe, logs: updatedLogs });
+      } catch (e) {
+        // Error handled
+      } finally {
+        setProcessingLogId(null);
+      }
+    }
+  };
+
+  const handleSetCover = async (logId: string, imgUrl: string) => {
+      setProcessingLogId(logId);
+      try {
+        await onUpdate({...recipe, coverImage: imgUrl});
+      } catch (e) {
+          // Error handled
+      } finally {
+        setProcessingLogId(null);
+      }
   };
 
   return (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden">
+    <div className="flex flex-col h-full bg-white relative overflow-hidden" {...swipeHandlers}>
       {/* Sticky Header */}
       <div className="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start pointer-events-none">
         <button 
@@ -209,31 +238,44 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                             还没有记录，点击右下角添加第一次烹饪吧！
                         </div>
                      ) : (
-                         recipe.logs.map(log => (
-                             <div key={log.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex gap-3">
-                                 {log.image && (
-                                     <div className="relative group shrink-0">
-                                        <img src={log.image} alt="Log" className="w-24 h-24 rounded-xl object-cover bg-gray-100" />
-                                        <button 
-                                            onClick={() => handleSetCover(log.image)}
-                                            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-white text-[10px] font-bold flex-col gap-1"
-                                        >
-                                            <ImageIcon size={16} />
-                                            设为封面
-                                        </button>
-                                     </div>
-                                 )}
-                                 <div className="flex-1 flex flex-col">
-                                     <div className="flex justify-between items-start mb-1">
-                                         <span className="text-xs text-gray-400 font-medium">{new Date(log.date).toLocaleDateString()}</span>
-                                         <button onClick={() => handleDeleteLog(log.id)} className="text-gray-300 hover:text-red-400 p-1">
-                                             <Trash2 size={14} />
-                                         </button>
-                                     </div>
-                                     <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap flex-1">{log.note}</p>
-                                 </div>
-                             </div>
-                         ))
+                         recipe.logs.map(log => {
+                             const isProcessingThis = processingLogId === log.id;
+                             return (
+                                <div key={log.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex gap-3 relative overflow-hidden">
+                                    {isProcessingThis && (
+                                        <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+                                            <Loader2 className="animate-spin text-[#1a472a]" />
+                                        </div>
+                                    )}
+                                    {log.image && (
+                                        <div className="relative group shrink-0">
+                                            <img src={log.image} alt="Log" className="w-24 h-24 rounded-xl object-cover bg-gray-100" />
+                                            <button 
+                                                onClick={() => handleSetCover(log.id, log.image)}
+                                                disabled={isProcessingThis}
+                                                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-white text-[10px] font-bold flex-col gap-1 disabled:pointer-events-none"
+                                            >
+                                                <ImageIcon size={16} />
+                                                设为封面
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div className="flex-1 flex flex-col">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="text-xs text-gray-400 font-medium">{new Date(log.date).toLocaleDateString()}</span>
+                                            <button 
+                                                onClick={() => handleDeleteLog(log.id)} 
+                                                disabled={isProcessingThis}
+                                                className="text-gray-300 hover:text-red-400 p-1 disabled:opacity-50"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap flex-1">{log.note}</p>
+                                    </div>
+                                </div>
+                             );
+                         })
                      )}
                 </div>
             </div>
@@ -269,14 +311,14 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
               <div className="bg-white w-full sm:w-[90%] sm:max-w-sm sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
                   <div className="flex justify-between items-center mb-6">
                       <h3 className="font-bold text-lg text-gray-800">记录一次烹饪</h3>
-                      <button onClick={() => setShowLogModal(false)} className="bg-gray-100 p-2 rounded-full text-gray-500 hover:bg-gray-200">
+                      <button onClick={() => setShowLogModal(false)} disabled={isSaving} className="bg-gray-100 p-2 rounded-full text-gray-500 hover:bg-gray-200">
                           <X size={20} />
                       </button>
                   </div>
 
                   {/* Image Uploader */}
                   <div className="mb-4">
-                      <label className="block w-full h-40 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-[#1a472a]/30 transition-all overflow-hidden relative">
+                      <label className={`block w-full h-40 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-[#1a472a]/30 transition-all overflow-hidden relative ${isSaving ? 'pointer-events-none opacity-50' : ''}`}>
                           {newLogImage ? (
                               <>
                                 <img src={newLogImage} alt="Preview" className="w-full h-full object-cover" />
@@ -288,7 +330,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                                   <span className="text-xs text-gray-400">点击上传成品图</span>
                               </>
                           )}
-                          <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
+                          <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} disabled={isSaving} />
                       </label>
                   </div>
 
@@ -297,15 +339,17 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                       value={newLogNote}
                       onChange={(e) => setNewLogNote(e.target.value)}
                       placeholder="味道如何？有什么需要改进的？"
-                      className="w-full bg-gray-50 rounded-xl p-4 h-32 text-sm outline-none resize-none mb-6 placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-[#1a472a]/10 transition-all"
+                      disabled={isSaving}
+                      className="w-full bg-gray-50 rounded-xl p-4 h-32 text-sm outline-none resize-none mb-6 placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-[#1a472a]/10 transition-all disabled:opacity-50"
                   />
 
                   <button 
                       onClick={handleSaveLog}
-                      className="w-full bg-[#1a472a] text-white py-4 rounded-xl font-bold text-base shadow-lg shadow-green-900/20 hover:bg-[#143620] active:scale-95 transition-all flex items-center justify-center gap-2"
+                      disabled={isSaving}
+                      className="w-full bg-[#1a472a] text-white py-4 rounded-xl font-bold text-base shadow-lg shadow-green-900/20 hover:bg-[#143620] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:bg-[#1a472a]/70 disabled:cursor-wait"
                   >
-                      <Check size={20} />
-                      完成记录
+                      {isSaving ? <Loader2 className="animate-spin" /> : <Check size={20} />}
+                      {isSaving ? '保存中...' : '完成记录'}
                   </button>
               </div>
           </div>
