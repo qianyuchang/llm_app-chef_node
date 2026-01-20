@@ -142,5 +142,28 @@ export const api = {
       }
       const data = await response.json();
       return data.image;
+  },
+
+  aiSearch: async (query: string, recipes: Recipe[]): Promise<string[]> => {
+      // Send lightweight recipe data
+      const lightweightRecipes = recipes.map(r => ({
+          id: r.id,
+          title: r.title,
+          category: r.category,
+          ingredients: r.ingredients
+      }));
+      
+      const response = await fetch(`${API_BASE_URL}/ai/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, recipes: lightweightRecipes }),
+      });
+      
+      if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || 'Search failed');
+      }
+      const data = await response.json();
+      return data.ids || [];
   }
 };

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, UtensilsCrossed, Flame, Sparkles, Settings } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, UtensilsCrossed, Flame, Sparkles, Settings, TrendingUp, History, Loader2, X } from 'lucide-react';
 import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
+import { api } from '../services/api';
 
 interface HomeProps {
   recipes: Recipe[];
@@ -11,15 +12,82 @@ interface HomeProps {
   onSettingsClick: () => void;
 }
 
+const RECOMMENDED_QUERIES = [
+    "下饭神菜",
+    "低卡减脂餐",
+    "快手早餐",
+    "暖胃汤羹",
+    "适合发朋友圈",
+    "周末硬菜",
+    "清淡饮食"
+];
+
 export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClick, onRecipeClick, onSettingsClick }) => {
   const [activeCategory, setActiveCategory] = useState<string>('全部');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // AI Search State
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [aiRecipeIds, setAiRecipeIds] = useState<string[] | null>(null);
+  const [isAiSearching, setIsAiSearching] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter Logic
   const filteredRecipes = recipes.filter(r => {
+    // 1. Category Filter
     const matchesCategory = activeCategory === '全部' || r.category === activeCategory;
-    const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // 2. Search Filter (Hybrid: AI Result OR Local Match)
+    let matchesSearch = true;
+    
+    if (aiRecipeIds !== null) {
+        // If AI search is active, strictly follow its result
+        matchesSearch = aiRecipeIds.includes(r.id);
+    } else if (searchQuery.trim()) {
+        // Fallback to local filtering
+        matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        r.ingredients.some(i => i.name.includes(searchQuery));
+    }
+
     return matchesCategory && matchesSearch;
   });
+
+  const handleAiSearch = async (query: string) => {
+      if (!query.trim()) return;
+      
+      setSearchQuery(query);
+      setIsSearchFocused(false);
+      setIsAiSearching(true);
+      setAiRecipeIds(null); // Clear previous results while loading
+
+      try {
+          const ids = await api.aiSearch(query, recipes);
+          setAiRecipeIds(ids);
+      } catch (error) {
+          console.error("AI Search failed", error);
+          // Fallback to local search is automatic if aiRecipeIds is null, 
+          // but we alert the user
+      } finally {
+          setIsAiSearching(false);
+      }
+  };
+
+  const clearSearch = () => {
+      setSearchQuery('');
+      setAiRecipeIds(null);
+      setIsAiSearching(false);
+  };
 
   // Calculate stats
   const masterScore = recipes.reduce((acc, r) => acc + (r.logs ? r.logs.length : 0), 0);
@@ -91,17 +159,76 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
         </div>
 
         {/* Search Bar & Order Button Row */}
-        <div className="flex gap-3 mb-5 items-center">
-          <div className="flex-1 relative shadow-sm rounded-full group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-[#385c44] transition-colors" />
-            <input 
-              type="text"
-              placeholder="今天想吃什么？"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white rounded-full text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#385c44]/10 transition-all placeholder:text-gray-400"
-            />
+        <div className="flex gap-3 mb-5 items-start relative z-50">
+          {/* Search Container with Dropdown */}
+          <div className="flex-1 relative group" ref={searchContainerRef}>
+            <div className={`relative shadow-sm rounded-2xl bg-white transition-all duration-300 ${isSearchFocused ? 'shadow-lg ring-2 ring-[#385c44]/10' : ''}`}>
+                <Search className={`absolute left-4 top-3.5 text-gray-400 w-4 h-4 transition-colors ${isSearchFocused ? 'text-[#385c44]' : ''}`} />
+                <input 
+                  type="text"
+                  placeholder="今天想吃什么？"
+                  value={searchQuery}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      // If user clears input, reset AI state
+                      if (!e.target.value) {
+                          setAiRecipeIds(null);
+                      }
+                  }}
+                  onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                          handleAiSearch(searchQuery);
+                      }
+                  }}
+                  className="w-full pl-10 pr-10 py-3 bg-transparent rounded-2xl text-sm text-gray-800 focus:outline-none placeholder:text-gray-400"
+                />
+                {/* Clear/Loading Icon */}
+                <div className="absolute right-3 top-3.5 text-gray-400">
+                    {isAiSearching ? (
+                        <Loader2 className="animate-spin w-4 h-4 text-[#385c44]" />
+                    ) : searchQuery ? (
+                        <button onClick={clearSearch}>
+                            <X className="w-4 h-4 hover:text-gray-600" />
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+
+            {/* Smart Suggestions Dropdown */}
+            {isSearchFocused && !isAiSearching && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                    <div className="mb-3 flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        <Sparkles size={12} className="text-[#385c44]" />
+                        <span>AI 猜你想找</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {RECOMMENDED_QUERIES.map((query) => (
+                            <button
+                                key={query}
+                                onClick={() => handleAiSearch(query)}
+                                className="px-3 py-1.5 bg-gray-50 hover:bg-[#385c44]/10 hover:text-[#385c44] rounded-lg text-xs text-gray-600 transition-colors font-medium active:scale-95"
+                            >
+                                {query}
+                            </button>
+                        ))}
+                    </div>
+                    
+                    {searchQuery.length > 1 && (
+                         <div className="mt-4 pt-3 border-t border-gray-50">
+                             <button 
+                                onClick={() => handleAiSearch(searchQuery)}
+                                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 text-sm text-[#385c44] font-bold"
+                             >
+                                 <Search size={14} />
+                                 AI 搜索 "{searchQuery}"
+                             </button>
+                         </div>
+                    )}
+                </div>
+            )}
           </div>
+
           <button 
             onClick={onOrderModeClick}
             className="w-[46px] h-[46px] bg-[#385c44] rounded-full flex items-center justify-center text-white shadow-xl shadow-[#385c44]/20 active:scale-95 transition-all flex-shrink-0"
@@ -148,6 +275,19 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
 
       {/* Masonry Grid with 2-Column Flexbox */}
       <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
+        {/* Search Status */}
+        {aiRecipeIds !== null && (
+             <div className="mb-4 flex items-center justify-between px-1">
+                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#385c44] bg-[#385c44]/10 px-3 py-1.5 rounded-full">
+                     <Sparkles size={12} />
+                     AI 筛选结果: {filteredRecipes.length} 个
+                 </div>
+                 <button onClick={clearSearch} className="text-xs text-gray-400 hover:text-gray-600 px-2">
+                     清除筛选
+                 </button>
+             </div>
+        )}
+
         {filteredRecipes.length > 0 ? (
           <div className="flex gap-4 items-start">
             <div className="flex-1 min-w-0 flex flex-col gap-4">
@@ -165,7 +305,8 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
             </div>
             <h3 className="text-lg font-bold text-gray-800 mb-3">没有找到相关菜谱</h3>
             <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-              也许它正等着你亲自下厨<br />
+              {aiRecipeIds !== null ? "AI 挠破了头也没找到..." : "也许它正等着你亲自下厨"}
+              <br />
               <span className="text-[#385c44] font-medium mt-1 inline-block">去创造第一个定义美味的人吧！</span>
             </p>
           </div>

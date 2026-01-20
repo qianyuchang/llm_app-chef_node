@@ -227,6 +227,66 @@ app.put('/api/settings', (req, res) => {
 
 // --- AI Routes ---
 
+app.post('/api/ai/search', async (req, res) => {
+  const modelName = getTextModel();
+  const { query, recipes } = req.body;
+
+  if (!query || !recipes) {
+      res.status(400).json({ error: 'Missing query or recipes' });
+      return;
+  }
+
+  const prompt = `
+      User Search Query: "${query}"
+      
+      Available Recipes (JSON):
+      ${JSON.stringify(recipes.map((r: any) => ({ id: r.id, title: r.title, category: r.category, ingredients: r.ingredients.map((i:any) => i.name).join(', ') })))}
+
+      Task: Select the recipes that best match the user's search query. The query might be about ingredients ("chicken"), taste ("spicy"), occasion ("dinner"), or abstract mood ("comfort food").
+      
+      Return JSON: { "ids": ["id1", "id2"] }
+      If no matches, return { "ids": [] }
+      Strictly JSON only.
+  `;
+
+  try {
+      let resultText = "";
+      
+      if (modelName.startsWith('doubao')) {
+          if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
+          const targetModel = ARK_ENDPOINT_ID || modelName;
+          const arkRes = await fetch(ARK_CHAT_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
+              body: JSON.stringify({
+                  model: targetModel,
+                  messages: [
+                    { role: 'system', content: 'You are a smart recipe search engine.' },
+                    { role: 'user', content: prompt }
+                  ],
+                  response_format: { type: 'json_object' } 
+              })
+          });
+          const data = await arkRes.json();
+          resultText = data.choices[0].message.content;
+      } else {
+          if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
+          const response = await ai.models.generateContent({
+              model: modelName,
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+          });
+          resultText = response.text || "{}";
+      }
+      
+      res.json(safeJsonParse(resultText));
+
+  } catch (error: any) {
+      console.error('AI Search Error:', error);
+      res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/ai/recommend-menu', async (req, res) => {
   const modelName = getTextModel();
   const { recipes, peopleCount } = req.body;
