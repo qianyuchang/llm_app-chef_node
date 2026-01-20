@@ -362,7 +362,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
           if (!arkRes.ok) {
               const errText = await arkRes.text();
               console.error("Ark API Error Body:", errText);
-              throw new Error(`Ark API Error: ${arkRes.status}`);
+              throw new Error(`Ark API Error: ${arkRes.status} - ${errText}`);
           }
           
           const data = await arkRes.json();
@@ -452,7 +452,11 @@ app.post('/api/ai/generate-image', async (req, res) => {
                     size: '768x1024' // 3:4 for vertical covers
                 })
             });
-            if (!arkRes.ok) throw new Error(`Doubao Image Error: ${arkRes.status}`);
+            if (!arkRes.ok) {
+                const errText = await arkRes.text();
+                console.error("Doubao T2I Error:", errText);
+                throw new Error(`Doubao Image Error: ${arkRes.status} - ${errText}`);
+            }
             const data = await arkRes.json();
             const base64 = data.data[0].b64_json;
             res.json({ image: `data:image/png;base64,${base64}` });
@@ -485,33 +489,79 @@ app.post('/api/ai/optimize-image', async (req, res) => {
     const modelName = getImageModel();
     console.log(`Image Optimization (Filter) requested. Model choice: ${modelName}`);
 
+    const base64Data = image.split(',')[1] || image;
+    const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
+
     try {
-        // Doubao Seedream is T2I (Text-to-Image), not standard Img2Img.
-        // For 'Filter' style optimization (preserving structure), we always fallback to Gemini.
-        if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
-        
-        const base64Data = image.split(',')[1] || image;
-        const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
+        if (modelName.startsWith('doubao')) {
+            // Doubao (Volcengine) Image-to-Image implementation
+            console.log("Using Doubao Img2Img...");
+            
+            // Note: The 'image' field in Ark API typically expects binary_data_base64 or a URL. 
+            // Since we have local base64, we will try to pass the raw base64 string.
+            // Some proxies/SDKs expect 'image_base64' or similar. 
+            // Based on user feedback: "image": "url" or possibly base64 string.
+            
+            const arkRes = await fetch(ARK_IMAGE_URL, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${ARK_API_KEY}` 
+                },
+                body: JSON.stringify({
+                    model: modelName,
+                    // Use Chinese prompt for Doubao as it works better natively
+                    prompt: "保持原有构图和食物主体，优化光影、色调和质感，使其具有高级美食摄影风格，增加暖色调和光泽感（锅气）。锐化细节，提升食欲感。",
+                    image: base64Data, // Sending raw base64 string as 'image' value
+                    // Try to request a standard square size if not specified, 
+                    // though for Img2Img usually size should match input or scale.
+                    // Doubao supports: 1024x1024, 768x1024 etc. We try to be safe with 1024x1024.
+                    size: '1024x1024', 
+                    strength: 0.65 // 0-1, higher means more change. 0.65 preserves structure but allows lighting fix.
+                })
+            });
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: {
-                parts: [
-                    { inlineData: { data: base64Data, mimeType: mimeType } },
-                    { text: 'Retouch this food image to match the style of high-end social media food photography (like XiaoHongShu). Apply a "Warm & Glossy" filter: boost warm tones (golden/orange), increase contrast for depth, enhance the oily gloss ("锅气") on the food surface, and apply soft cinematic lighting. Sharpen details. CRITICAL: Keep the original food structure and plating 100% unchanged. Do not add or remove items. Return the image with these enhancements.' },
-                ],
-            },
-        });
-
-        let resultBase64 = "";
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                resultBase64 = part.inlineData.data || "";
-                break;
+            if (!arkRes.ok) {
+                const errText = await arkRes.text();
+                console.error("Doubao Img2Img Error:", errText);
+                throw new Error(`Doubao Optimize Error: ${arkRes.status} - ${errText}`);
             }
+
+            const data = await arkRes.json();
+            // Doubao usually returns 'b64_json' or 'image_url'
+            const resultBase64 = data.data?.[0]?.b64_json || data.data?.[0]?.binary_data_base64;
+            
+            if (!resultBase64) {
+                 console.error("Doubao response missing image data:", JSON.stringify(data));
+                 throw new Error("Doubao returned no image data");
+            }
+            
+            res.json({ image: `data:image/png;base64,${resultBase64}` });
+
+        } else {
+            // Fallback to Gemini
+            if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: {
+                    parts: [
+                        { inlineData: { data: base64Data, mimeType: mimeType } },
+                        { text: 'Retouch this food image to match the style of high-end social media food photography (like XiaoHongShu). Apply a "Warm & Glossy" filter: boost warm tones (golden/orange), increase contrast for depth, enhance the oily gloss ("锅气") on the food surface, and apply soft cinematic lighting. Sharpen details. CRITICAL: Keep the original food structure and plating 100% unchanged. Do not add or remove items. Return the image with these enhancements.' },
+                    ],
+                },
+            });
+
+            let resultBase64 = "";
+            for (const part of response.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    resultBase64 = part.inlineData.data || "";
+                    break;
+                }
+            }
+            if (!resultBase64) throw new Error("Optimization failed - no image returned");
+            res.json({ image: `data:image/png;base64,${resultBase64}` });
         }
-        if (!resultBase64) throw new Error("Optimization failed - no image returned");
-        res.json({ image: `data:image/png;base64,${resultBase64}` });
 
     } catch (error: any) {
         console.error('Image Optimization Error:', error);
