@@ -32,23 +32,24 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
     <div 
       key={recipe.id} 
       onClick={() => onRecipeClick(recipe)}
-      className="bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4"
+      className="bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 will-change-transform"
       style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
     >
       {/* Touch Feedback Overlay */}
       <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
 
-      <div className="relative">
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '3/4' }}>
         <img 
           src={recipe.coverImage} 
           alt={recipe.title} 
-          className="w-full object-cover bg-gray-50 block"
-          style={{ aspectRatio: '3/4' }} 
+          className="w-full h-full object-cover bg-gray-50 block transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         
         {/* Proficiency Badge */}
-        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center">
+        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center z-10">
            <span className="text-[10px] text-[#385c44] font-bold tracking-wide leading-none pt-[1px]">
              {PROFICIENCY_TEXT[recipe.proficiency]}
            </span>
@@ -56,7 +57,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
 
         {/* Cooking Count Overlay */}
         {recipe.logs && recipe.logs.length > 0 && (
-            <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10">
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10 z-10">
                 <Flame size={10} fill="currentColor" className="text-orange-400" />
                 {recipe.logs.length}
             </div>
@@ -77,7 +78,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   return (
     <div className="flex flex-col h-full bg-[#f2f4f6]">
       {/* Header Area */}
-      <div className="px-6 pt-2 pb-2 bg-[#f2f4f6] sticky top-0 z-10">
+      <div className="px-6 pt-2 pb-2 bg-[#f2f4f6] sticky top-0 z-30">
         
         {/* App Title & Settings */}
         <div className="relative py-3 flex items-center justify-center">
@@ -146,14 +147,14 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
         </div>
       </div>
 
-      {/* Masonry Grid with 2-Column Flexbox for maximum stability */}
+      {/* Masonry Grid with 2-Column Flexbox */}
       <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
         {filteredRecipes.length > 0 ? (
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="flex gap-4 items-start">
+            <div className="flex-1 min-w-0">
               {leftColRecipes.map(renderRecipeCard)}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               {rightColRecipes.map(renderRecipeCard)}
             </div>
           </div>

@@ -272,7 +272,10 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
               },
               body: JSON.stringify({
                   model: targetModel, 
-                  messages: [{ role: 'user', content: prompt }],
+                  messages: [
+                    { role: 'system', content: 'You are an expert chef assistant helping users select balanced and seasonal meals.' },
+                    { role: 'user', content: prompt }
+                  ],
                   response_format: { type: 'json_object' } 
               })
           });
@@ -287,7 +290,10 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
           const response = await ai.models.generateContent({
               model: modelName,
               contents: prompt,
-              config: { responseMimeType: 'application/json' }
+              config: { 
+                systemInstruction: 'You are an expert chef assistant helping users select balanced and seasonal meals.',
+                responseMimeType: 'application/json' 
+              }
           });
           const parsed = safeJsonParse(response.text || '{}');
           res.json(normalizeMenuResponse(parsed));
@@ -304,23 +310,24 @@ app.post('/api/ai/generate-menu', async (req, res) => {
   const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
 
   const prompt = `
-      Create a poetic menu theme for these dishes: ${selectedRecipes.map((r: any) => r.title).join(', ')}.
+      Create a highly poetic and visually distinct menu theme for these dishes: ${selectedRecipes.map((r: any) => r.title).join(', ')}.
       
       Required Fields:
-      - title: A poetic 4-character Chinese name for the meal (e.g. 荷塘月色, 春意盎然).
+      - title: A poetic 4-character Chinese name for the meal (e.g. 荷塘月色, 岁晚林深).
       - description: A short, elegant description in Chinese (approx 15 words).
       - idiom: A 3-character artistic phrase or idiom that captures the soul of the meal (e.g. 寻味集, 慢生活, 悦己食).
-      - themeColor: Choose one of these based on the food character:
-          - "red": For spicy, hot, festive, or bold meat dishes.
-          - "green": For healthy, light, vegetable-heavy, or refreshing spring dishes.
-          - "blue": For seafood, cold dishes, or modern fusion.
-          - "neutral": For classic, earthy, stewed, or homey comfort food.
+      - themeColor: You MUST choose the most appropriate color based on the actual ingredients:
+          - "red": For spicy (chili), bold meats, festive themes, or hot pots.
+          - "green": For vegetable-heavy, healthy, organic, or light spring/summer vibes.
+          - "blue": For seafood, chilled dishes, modern fusion, or summer cool.
+          - "neutral": ONLY for classic comfort food, home stews, or earthy brown dishes.
       
-      Rules:
-      1. If most dishes are spicy, use "red".
-      2. If most are veggies or light, use "green".
-      3. If they are traditional stews or warm home food, use "neutral".
-      4. DO NOT ALWAYS USE THE SAME COLOR. BE CREATIVE.
+      CRITICAL RULES:
+      1. ANALYZE THE INGREDIENTS. Don't just pick "neutral".
+      2. If there are any seafood items, strongly consider "blue".
+      3. If there is chili or a celebratory name, use "red".
+      4. If it is light/salad/veggie, use "green".
+      5. BE ADVENTUROUS WITH COLOR CHOICE. DO NOT DEFAULT TO NEUTRAL EVERY TIME.
       
       Return JSON format: { "title": "...", "description": "...", "idiom": "...", "themeColor": "..." }
       IMPORTANT: Return ONLY valid JSON.
@@ -338,7 +345,10 @@ app.post('/api/ai/generate-menu', async (req, res) => {
               },
               body: JSON.stringify({
                   model: targetModel, 
-                  messages: [{ role: 'user', content: prompt }],
+                  messages: [
+                    { role: 'system', content: 'You are a creative artistic director for high-end restaurants. Your goal is to create poetic menu titles and distinct aesthetic themes.' },
+                    { role: 'user', content: prompt }
+                  ],
                   response_format: { type: 'json_object' } 
               })
           });
@@ -351,7 +361,10 @@ app.post('/api/ai/generate-menu', async (req, res) => {
           const response = await ai.models.generateContent({
               model: modelName,
               contents: prompt,
-              config: { responseMimeType: 'application/json' }
+              config: { 
+                systemInstruction: 'You are a creative artistic director for high-end restaurants. Your goal is to create poetic menu titles and distinct aesthetic themes.',
+                responseMimeType: 'application/json' 
+              }
           });
           res.json(safeJsonParse(response.text || '{}'));
       }
@@ -382,13 +395,25 @@ app.post('/api/ai/generate-prep', async (req, res) => {
             const arkRes = await fetch(ARK_CHAT_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
-                body: JSON.stringify({ model: targetModel, messages: [{ role: 'user', content: prompt }] })
+                body: JSON.stringify({ 
+                  model: targetModel, 
+                  messages: [
+                    { role: 'system', content: 'You are a helpful kitchen assistant specializing in ingredient management.' },
+                    { role: 'user', content: prompt }
+                  ] 
+                })
             });
             const data = await arkRes.json();
             res.json({ text: data.choices[0].message.content });
         } else {
             if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
-            const response = await ai.models.generateContent({ model: modelName, contents: prompt });
+            const response = await ai.models.generateContent({ 
+              model: modelName, 
+              contents: prompt,
+              config: {
+                systemInstruction: 'You are a helpful kitchen assistant specializing in ingredient management.'
+              }
+            });
             res.json({ text: response.text });
         }
     } catch (error: any) {
