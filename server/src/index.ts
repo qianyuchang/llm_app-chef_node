@@ -310,14 +310,23 @@ app.post('/api/ai/generate-menu', async (req, res) => {
   const { recipes, selectedIds } = req.body;
   const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
 
+  // Determine season for poetic context
+  const month = new Date().getMonth() + 1;
+  let season = 'Winter';
+  if (month >= 3 && month <= 5) season = 'Spring';
+  else if (month >= 6 && month <= 8) season = 'Summer';
+  else if (month >= 9 && month <= 11) season = 'Autumn';
+
   const prompt = `
       Create a highly poetic and visually distinct menu theme for these dishes: ${selectedRecipes.map((r: any) => r.title).join(', ')}.
+      Current Season: ${season}.
       
       Required Fields:
       - title: A poetic 4-character Chinese name for the meal (e.g. 荷塘月色, 岁晚林深).
       - description: A short, elegant description in Chinese (approx 15 words).
       - idiom: A 3-character artistic phrase or idiom that captures the soul of the meal (e.g. 寻味集, 慢生活, 悦己食).
       - themeColor: You MUST choose the most appropriate color based on the actual ingredients.
+      - seasonalPhrase: A very concise, highly artistic and poetic Chinese sentence (max 12 characters) reflecting the CURRENT SEASON (${season}) and mood. It will be placed at the bottom of the menu. (e.g. "晚来天欲雪，能饮一杯无", "人间至味是清欢", "且将新火试新茶").
       
       CRITICAL COLOR RULES:
       - "red": Spicy (chili), bold meats, festive, or hot pots.
@@ -330,7 +339,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
       - If there is seafood, prioritize "blue".
       - If there is spice, prioritize "red".
       
-      Return JSON format: { "title": "...", "description": "...", "idiom": "...", "themeColor": "..." }
+      Return JSON format: { "title": "...", "description": "...", "idiom": "...", "themeColor": "...", "seasonalPhrase": "..." }
       IMPORTANT: Return ONLY valid JSON.
       
       Random Seed: ${Math.random()}

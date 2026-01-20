@@ -19,6 +19,7 @@ interface MenuThemeData {
   description: string;
   idiom: string;
   themeColor: string;
+  seasonalPhrase?: string;
 }
 
 export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBack, onShowToast }) => {
@@ -571,8 +572,9 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                   {/* Footer Seal & Idiom */}
                   <div className="w-full flex justify-center mt-12 relative h-24">
                       <div className="flex flex-col items-center gap-3">
+                          {/* Use seasonalPhrase here instead of description */}
                           <p className="text-xs italic font-serif" style={{ color: themeStyles.primary }}>
-                              {menuTheme.description}
+                              {menuTheme.seasonalPhrase || menuTheme.description}
                           </p>
                           {/* Stamp */}
                           <div className="w-8 h-8 border border-[#A83838] rounded-sm flex items-center justify-center bg-white/50 shadow-sm">
@@ -580,8 +582,10 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                                   知味
                               </span>
                           </div>
-                          <p className="text-[10px] uppercase tracking-widest opacity-40" style={{ color: themeStyles.text }}>
-                              {new Date().toDateString()}
+                          
+                          {/* Restore Date */}
+                          <p className="text-[10px] tracking-widest opacity-60 mt-2 font-medium" style={{ color: themeStyles.text }}>
+                              {new Date().toLocaleDateString('zh-CN')}
                           </p>
                       </div>
                       
