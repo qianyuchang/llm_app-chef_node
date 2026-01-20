@@ -271,7 +271,8 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
                   'Authorization': `Bearer ${ARK_API_KEY}`
               },
               body: JSON.stringify({
-                  model: targetModel, 
+                  model: targetModel,
+                  temperature: 0.7, // Add temperature for variety
                   messages: [
                     { role: 'system', content: 'You are an expert chef assistant helping users select balanced and seasonal meals.' },
                     { role: 'user', content: prompt }
@@ -316,27 +317,31 @@ app.post('/api/ai/generate-menu', async (req, res) => {
       - title: A poetic 4-character Chinese name for the meal (e.g. 荷塘月色, 岁晚林深).
       - description: A short, elegant description in Chinese (approx 15 words).
       - idiom: A 3-character artistic phrase or idiom that captures the soul of the meal (e.g. 寻味集, 慢生活, 悦己食).
-      - themeColor: You MUST choose the most appropriate color based on the actual ingredients:
-          - "red": For spicy (chili), bold meats, festive themes, or hot pots.
-          - "green": For vegetable-heavy, healthy, organic, or light spring/summer vibes.
-          - "blue": For seafood, chilled dishes, modern fusion, or summer cool.
-          - "neutral": ONLY for classic comfort food, home stews, or earthy brown dishes.
+      - themeColor: You MUST choose the most appropriate color based on the actual ingredients.
       
-      CRITICAL RULES:
-      1. ANALYZE THE INGREDIENTS. Don't just pick "neutral".
-      2. If there are any seafood items, strongly consider "blue".
-      3. If there is chili or a celebratory name, use "red".
-      4. If it is light/salad/veggie, use "green".
-      5. BE ADVENTUROUS WITH COLOR CHOICE. DO NOT DEFAULT TO NEUTRAL EVERY TIME.
+      CRITICAL COLOR RULES:
+      - "red": Spicy (chili), bold meats, festive, or hot pots.
+      - "green": Vegetable-heavy, healthy, organic, or light spring/summer vibes.
+      - "blue": Seafood, chilled dishes, modern fusion, or summer cool.
+      - "neutral": ONLY for classic comfort food, home stews, or earthy brown dishes.
+      
+      IMPORTANT: 
+      - DO NOT default to "neutral". Be creative.
+      - If there is seafood, prioritize "blue".
+      - If there is spice, prioritize "red".
       
       Return JSON format: { "title": "...", "description": "...", "idiom": "...", "themeColor": "..." }
       IMPORTANT: Return ONLY valid JSON.
+      
+      Random Seed: ${Math.random()}
   `;
 
   try {
       if (modelName.startsWith('doubao')) {
+          console.log(`Using Doubao Model: ${ARK_ENDPOINT_ID || modelName}`);
           if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
           const targetModel = ARK_ENDPOINT_ID || modelName;
+          
           const arkRes = await fetch(ARK_CHAT_URL, {
               method: 'POST',
               headers: {
@@ -344,16 +349,25 @@ app.post('/api/ai/generate-menu', async (req, res) => {
                   'Authorization': `Bearer ${ARK_API_KEY}`
               },
               body: JSON.stringify({
-                  model: targetModel, 
+                  model: targetModel,
+                  temperature: 0.95, // Higher temperature for varied style
                   messages: [
-                    { role: 'system', content: 'You are a creative artistic director for high-end restaurants. Your goal is to create poetic menu titles and distinct aesthetic themes.' },
+                    { role: 'system', content: 'You are a creative artistic director for high-end restaurants. You MUST generate varied and distinct themes. Avoid using the same style repeatedly.' },
                     { role: 'user', content: prompt }
                   ],
                   response_format: { type: 'json_object' } 
               })
           });
-          if (!arkRes.ok) throw new Error(`Ark API Error: ${arkRes.status}`);
+          
+          if (!arkRes.ok) {
+              const errText = await arkRes.text();
+              console.error("Ark API Error Body:", errText);
+              throw new Error(`Ark API Error: ${arkRes.status}`);
+          }
+          
           const data = await arkRes.json();
+          console.log("Ark Raw Response:", JSON.stringify(data, null, 2));
+          
           const content = data.choices[0].message.content;
           res.json(safeJsonParse(content));
       } else {
@@ -362,7 +376,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
               model: modelName,
               contents: prompt,
               config: { 
-                systemInstruction: 'You are a creative artistic director for high-end restaurants. Your goal is to create poetic menu titles and distinct aesthetic themes.',
+                systemInstruction: 'You are a creative artistic director for high-end restaurants. You MUST generate varied and distinct themes.',
                 responseMimeType: 'application/json' 
               }
           });
@@ -414,7 +428,8 @@ app.post('/api/ai/generate-prep', async (req, res) => {
                 systemInstruction: 'You are a helpful kitchen assistant specializing in ingredient management.'
               }
             });
-            res.json({ text: response.text });
+            // Fix TS Error: Ensure string assignment
+            res.json({ text: response.text || '' });
         }
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -451,7 +466,8 @@ app.post('/api/ai/generate-image', async (req, res) => {
             let base64 = "";
             for (const part of response.candidates?.[0]?.content?.parts || []) {
                 if (part.inlineData) {
-                    base64 = part.inlineData.data;
+                    // Fix TS Error: Ensure string assignment
+                    base64 = part.inlineData.data || "";
                     break;
                 }
             }
@@ -490,7 +506,7 @@ app.post('/api/ai/optimize-image', async (req, res) => {
         let resultBase64 = "";
         for (const part of response.candidates?.[0]?.content?.parts || []) {
             if (part.inlineData) {
-                resultBase64 = part.inlineData.data;
+                resultBase64 = part.inlineData.data || "";
                 break;
             }
         }

@@ -32,17 +32,16 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
     <div 
       key={recipe.id} 
       onClick={() => onRecipeClick(recipe)}
-      className="bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 will-change-transform"
-      style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
+      className="bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 transition-transform duration-200 active:scale-[0.98]"
     >
       {/* Touch Feedback Overlay */}
       <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
 
-      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '3/4' }}>
+      <div className="relative w-full overflow-hidden bg-gray-50" style={{ aspectRatio: '3/4' }}>
         <img 
           src={recipe.coverImage} 
           alt={recipe.title} 
-          className="w-full h-full object-cover bg-gray-50 block transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
           decoding="async"
         />
@@ -151,10 +150,10 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
       <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
         {filteredRecipes.length > 0 ? (
           <div className="flex gap-4 items-start">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex flex-col gap-4">
               {leftColRecipes.map(renderRecipeCard)}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex flex-col gap-4">
               {rightColRecipes.map(renderRecipeCard)}
             </div>
           </div>
