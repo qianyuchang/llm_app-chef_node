@@ -449,8 +449,9 @@ app.post('/api/ai/generate-image', async (req, res) => {
                 body: JSON.stringify({
                     model: modelName,
                     prompt: prompt,
-                    // FIX: Doubao requires at least 3.6M pixels for Seedream. "2K" is a supported preset string.
-                    size: '2K' 
+                    size: '2K', // Supported preset
+                    response_format: 'b64_json', // Explicitly request base64
+                    watermark: false // Disable watermark
                 })
             });
             if (!arkRes.ok) {
@@ -458,8 +459,20 @@ app.post('/api/ai/generate-image', async (req, res) => {
                 console.error("Doubao T2I Error:", errText);
                 throw new Error(`Doubao Image Error: ${arkRes.status} - ${errText}`);
             }
+            
             const data = await arkRes.json();
-            const base64 = data.data[0].b64_json;
+            
+            // Log usage if available
+            if (data.usage) {
+                console.log("Doubao Usage:", JSON.stringify(data.usage));
+            }
+
+            // Strict response parsing based on user feedback
+            const base64 = data.data?.[0]?.b64_json;
+            if (!base64) {
+                 console.error("Doubao response missing image data:", JSON.stringify(data));
+                 throw new Error("Doubao returned no image data (b64_json is empty)");
+            }
             res.json({ image: `data:image/png;base64,${base64}` });
         } else {
             if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
@@ -508,11 +521,12 @@ app.post('/api/ai/optimize-image', async (req, res) => {
                     model: modelName,
                     // Use Chinese prompt for Doubao as it works better natively
                     prompt: "保持原有构图和食物主体，优化光影、色调和质感，使其具有高级美食摄影风格，增加暖色调和光泽感（锅气）。锐化细节，提升食欲感。",
-                    // FIX: Doubao requires full Data URI string (e.g. "data:image/png;base64,...") for image inputs
+                    // Note: 'image' must include the Data URI scheme header (e.g. data:image/png;base64,...)
                     image: image, 
-                    // FIX: Ensure size meets pixel requirement (>3.6M pixels) by using "2K" preset
                     size: '2K', 
-                    strength: 0.65 
+                    strength: 0.65,
+                    response_format: 'b64_json', // Explicitly request base64
+                    watermark: false // Disable watermark
                 })
             });
 
@@ -523,12 +537,18 @@ app.post('/api/ai/optimize-image', async (req, res) => {
             }
 
             const data = await arkRes.json();
-            // Doubao usually returns 'b64_json' or 'image_url'
-            const resultBase64 = data.data?.[0]?.b64_json || data.data?.[0]?.binary_data_base64;
+            
+            // Log usage if available
+            if (data.usage) {
+                console.log("Doubao Usage:", JSON.stringify(data.usage));
+            }
+
+            // Strict response parsing based on user feedback
+            const resultBase64 = data.data?.[0]?.b64_json;
             
             if (!resultBase64) {
                  console.error("Doubao response missing image data:", JSON.stringify(data));
-                 throw new Error("Doubao returned no image data");
+                 throw new Error("Doubao returned no image data (b64_json is empty)");
             }
             
             res.json({ image: `data:image/png;base64,${resultBase64}` });
