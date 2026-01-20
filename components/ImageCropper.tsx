@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import Cropper from 'react-easy-crop';
-import { Check, X, Sparkles, Loader2 } from 'lucide-react';
+import { Check, X, Sparkles, Loader2, Eye, RotateCcw } from 'lucide-react';
 import { api } from '../services/api';
 
 // Define types locally to avoid import issues with esm.sh
@@ -96,6 +96,10 @@ const resizeForAI = async (imageSrc: string, maxDimension = 1024): Promise<strin
 
 export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComplete, onCancel, aspect = 1 }) => {
   const [currentImage, setCurrentImage] = useState(imageSrc);
+  const [originalImage, setOriginalImage] = useState(imageSrc); // Backup for comparison/reset
+  const [hasOptimized, setHasOptimized] = useState(false);
+  const [isShowingOriginal, setIsShowingOriginal] = useState(false); // For compare interaction
+
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
@@ -135,6 +139,9 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   }, []);
 
   const handleSave = async () => {
+    // If comparing (holding down), do not save
+    if (isShowingOriginal) return;
+
     if (croppedAreaPixels) {
       try {
         const croppedImage = await getCroppedImg(currentImage, croppedAreaPixels);
@@ -153,6 +160,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         const resizedImage = await resizeForAI(currentImage);
         const optimized = await api.optimizeImage(resizedImage);
         setCurrentImage(optimized);
+        setHasOptimized(true);
         setZoom(1); 
     } catch (err) {
         console.error(err);
@@ -163,13 +171,21 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     }
   };
 
+  const handleReset = () => {
+      setCurrentImage(originalImage);
+      setHasOptimized(false);
+      setZoom(1);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col h-[100dvh]">
       <div className="flex justify-between items-center p-4 z-10 bg-black/50 backdrop-blur-sm text-white absolute top-0 left-0 right-0 safe-top">
           <button onClick={onCancel} className="p-2">
             <X size={24} />
           </button>
-          <span className="font-bold text-sm">调整封面</span>
+          <span className="font-bold text-sm flex items-center gap-2">
+              {isShowingOriginal ? <span className="text-yellow-400">显示原图</span> : '调整封面'}
+          </span>
           <button onClick={handleSave} className="p-2 text-[#4ade80]">
             <Check size={24} />
           </button>
@@ -181,7 +197,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       */}
       <div className="relative flex-1 bg-black w-full h-full touch-none overflow-hidden">
         <Cropper
-          image={currentImage}
+          image={isShowingOriginal ? originalImage : currentImage}
           crop={crop}
           zoom={zoom}
           aspect={aspect}
@@ -200,14 +216,38 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       </div>
 
       <div className="p-6 bg-black text-white pb-[calc(2.5rem+env(safe-area-inset-bottom))] flex flex-col gap-4 z-10">
-         <button 
-            onClick={handleOptimize}
-            disabled={isOptimizing}
-            className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-         >
-             <Sparkles size={16} fill="white" />
-             AI 美食滤镜优化
-         </button>
+         
+         <div className="flex gap-3">
+             {hasOptimized ? (
+                 <>
+                    <button 
+                        onMouseDown={() => setIsShowingOriginal(true)}
+                        onMouseUp={() => setIsShowingOriginal(false)}
+                        onTouchStart={() => setIsShowingOriginal(true)}
+                        onTouchEnd={() => setIsShowingOriginal(false)}
+                        className="flex-1 py-3 bg-gray-800 rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg active:scale-95 transition-all border border-gray-700 select-none touch-none"
+                    >
+                        <Eye size={16} className="text-gray-300" />
+                        按住对比
+                    </button>
+                    <button 
+                        onClick={handleReset}
+                        className="px-4 bg-gray-800 rounded-xl flex items-center justify-center shadow-lg active:scale-95 transition-all border border-gray-700 text-gray-400"
+                    >
+                        <RotateCcw size={18} />
+                    </button>
+                 </>
+             ) : (
+                <button 
+                    onClick={handleOptimize}
+                    disabled={isOptimizing}
+                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <Sparkles size={16} fill="white" />
+                    AI 美食滤镜优化
+                </button>
+             )}
+         </div>
 
          <div className="flex items-center gap-4">
             <span className="text-xs text-gray-400">缩放</span>

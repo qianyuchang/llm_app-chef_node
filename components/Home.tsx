@@ -104,8 +104,12 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
               <div 
                 key={recipe.id} 
                 onClick={() => onRecipeClick(recipe)}
-                className="break-inside-avoid bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] transition-all duration-300 active:scale-[0.98] group cursor-pointer border border-gray-100/50"
+                className="break-inside-avoid bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative"
+                style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
               >
+                {/* Touch Feedback Overlay (Replaces active:scale to prevent layout flicker) */}
+                <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
+
                 <div className="relative">
                   <img 
                     src={recipe.coverImage} 
@@ -113,7 +117,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
                     className="w-full object-cover bg-gray-50"
                     style={{ aspectRatio: '3/4' }} 
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                   
                   {/* Proficiency Badge - Fixed for Mobile alignment */}
                   <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center">

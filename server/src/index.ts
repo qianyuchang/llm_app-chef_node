@@ -5,6 +5,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import path from 'path';
 import fs from 'fs';
 import { Server } from 'http';
+import { Buffer } from 'buffer';
 
 // Global error handlers to prevent silent crashes
 (process as any).on('uncaughtException', (err: any) => {
@@ -82,12 +83,24 @@ const safeJsonParse = (text: string) => {
     // Continue to substring strategy
   }
 
-  // 3. Find the first '{' and the last '}' to handle conversational prefixes/suffixes
-  const firstOpen = clean.indexOf('{');
-  const lastClose = clean.lastIndexOf('}');
+  // 3. Find the first '{' or '[' (for arrays) and the last '}' or ']'
+  const firstOpenBrace = clean.indexOf('{');
+  const firstOpenBracket = clean.indexOf('[');
   
-  if (firstOpen !== -1 && lastClose !== -1) {
-    const jsonSubstring = clean.substring(firstOpen, lastClose + 1);
+  // Determine which starts first to decide if it's an object or array
+  let startIndex = -1;
+  let endIndex = -1;
+
+  if (firstOpenBrace !== -1 && (firstOpenBracket === -1 || firstOpenBrace < firstOpenBracket)) {
+      startIndex = firstOpenBrace;
+      endIndex = clean.lastIndexOf('}');
+  } else if (firstOpenBracket !== -1) {
+      startIndex = firstOpenBracket;
+      endIndex = clean.lastIndexOf(']');
+  }
+  
+  if (startIndex !== -1 && endIndex !== -1) {
+    const jsonSubstring = clean.substring(startIndex, endIndex + 1);
     try {
       return JSON.parse(jsonSubstring);
     } catch (e) {
@@ -100,6 +113,50 @@ const safeJsonParse = (text: string) => {
   // We limit the raw text length to prevent excessively large error headers.
   const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
   throw new Error(`JSON Parse Failed. Raw Output: ${preview}`);
+};
+
+/**
+ * Normalizes AI response for menu recommendation.
+ * Ensures the output always contains `selectedIds`.
+ * Handles:
+ * 1. Raw Arrays: ["id1", "id2"] -> { selectedIds: ["id1", "id2"] }
+ * 2. Wrong Keys: { "selected_recipes": [...] } -> { selectedIds: [...] }
+ */
+const normalizeMenuResponse = (parsed: any) => {
+    if (Array.isArray(parsed)) {
+        console.log("AI returned raw array. Normalizing to { selectedIds }.");
+        return { selectedIds: parsed };
+    }
+    
+    if (parsed && typeof parsed === 'object') {
+        // If 'selectedIds' is present and is an array, we are good.
+        if (Array.isArray(parsed.selectedIds)) {
+            return parsed;
+        }
+
+        // Handle common key variations (Doubao often uses 'selected_recipes')
+        const possibleKeys = ['selected_recipes', 'recipes', 'ids', 'dishes', 'menu'];
+        for (const key of possibleKeys) {
+            if (Array.isArray(parsed[key])) {
+                console.log(`AI returned object with key '${key}'. Mapping to 'selectedIds'.`);
+                return { ...parsed, selectedIds: parsed[key] };
+            }
+        }
+        
+        // Fallback: Find ANY key that holds an array of strings/numbers
+        const keys = Object.keys(parsed);
+        for (const key of keys) {
+             const val = parsed[key];
+             // Check if it's an array and (empty OR contains string/number)
+             if (Array.isArray(val) && (val.length === 0 || typeof val[0] === 'string' || typeof val[0] === 'number')) {
+                 console.log(`Found likely array candidate in key '${key}'. Mapping to 'selectedIds'.`);
+                 return { ...parsed, selectedIds: val.map(String) }; // Ensure they are strings
+             }
+        }
+    }
+    
+    // Return original if we couldn't fix it, let frontend/validation handle the error
+    return parsed;
 };
 
 // --- Routes ---
@@ -239,7 +296,7 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
       Available Recipes: 
       ${JSON.stringify(recipes.map((r: any) => ({ id: r.id, title: r.title, category: r.category, ingredients: r.ingredients })))}
 
-      Return a JSON object containing an array of selected recipe IDs.
+      Return JSON format: { "selectedIds": ["id1", "id2", ...] }
       IMPORTANT: Return ONLY valid JSON. Do NOT use Markdown code blocks.
   `;
 
@@ -277,8 +334,11 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
           const content = data.choices[0].message.content;
           console.log("Doubao Raw Response:", content);
           
-          // Use robust parser
-          res.json(safeJsonParse(content));
+          // Use robust parser & normalize
+          let parsed = safeJsonParse(content);
+          parsed = normalizeMenuResponse(parsed);
+          
+          res.json(parsed);
 
       } else {
           // Gemini
@@ -303,8 +363,12 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
                   }
               }
           });
-          // Use robust parser even for Gemini, just in case
-          res.json(safeJsonParse(response.text || '{}'));
+          
+          // Use robust parser & normalize
+          let parsed = safeJsonParse(response.text || '{}');
+          parsed = normalizeMenuResponse(parsed);
+          
+          res.json(parsed);
       }
   } catch (error: any) {
       console.error('AI Recommend Menu Error:', error);
@@ -497,7 +561,8 @@ app.post('/api/ai/optimize-image', async (req, res) => {
 
       console.log(`Optimizing image type: ${mimeType}, length: ${base64Data.length}`);
 
-      const prompt = "Enhance this food photo. Make it look like professional high-end food photography with warm lighting, appetizing glossy texture, and studio quality. Significantly improve the color grading, contrast and sharpness to make it mouth-watering.";
+      // Optimized prompt for "Food Filter" effect
+      const prompt = "Act as a professional food photographer's retoucher. Apply a 'Delicious' filter to this image. Enhance the warm tones, increase contrast and saturation slightly to make the food look fresh and appetizing. Fix lighting to be soft and studio-like. Maintain the original composition and content exactly, just improve the aesthetics.";
 
       const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image', // Fixed model for image editing
@@ -617,18 +682,18 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Handle SIGTERM (Railway/Docker stop signal)
-process.on('SIGTERM', () => {
+(process as any).on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
   server.close(() => {
     console.log('HTTP server closed');
-    process.exit(0);
+    (process as any).exit(0);
   });
 });
 
-process.on('SIGINT', () => {
+(process as any).on('SIGINT', () => {
   console.log('SIGINT signal received: closing HTTP server');
   server.close(() => {
     console.log('HTTP server closed');
-    process.exit(0);
+    (process as any).exit(0);
   });
 });
