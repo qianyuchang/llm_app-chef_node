@@ -30,4 +30,8 @@ export interface CartItem {
   quantity: number;
 }
 
-export type ViewState = 'HOME' | 'ADD_RECIPE' | 'ORDER_MODE' | 'CATEGORY_MANAGER' | 'RECIPE_DETAIL';
+export interface Settings {
+  aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025';
+}
+
+export type ViewState = 'HOME' | 'ADD_RECIPE' | 'ORDER_MODE' | 'CATEGORY_MANAGER' | 'RECIPE_DETAIL' | 'SETTINGS';

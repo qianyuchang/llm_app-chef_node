@@ -8,8 +8,12 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Expose API_KEY to the client-side code safely
+      // Expose API_KEY to the client-side code safely (Existing)
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      // Explicitly expose VITE_API_URL as a global constant. 
+      // This avoids "Cannot read properties of undefined (reading 'VITE_API_URL')" errors
+      // caused by import.meta.env being undefined at runtime in some environments.
+      '__API_URL__': JSON.stringify(process.env.VITE_API_URL || env.VITE_API_URL || ''),
     },
     // No proxy needed for separate deployment strategy (Direct CORS request)
     server: {

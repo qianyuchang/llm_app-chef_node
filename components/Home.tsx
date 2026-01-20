@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, UtensilsCrossed, Flame, Sparkles } from 'lucide-react';
+import { Search, UtensilsCrossed, Flame, Sparkles, Settings } from 'lucide-react';
 import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 
@@ -8,9 +8,10 @@ interface HomeProps {
   categories: string[];
   onOrderModeClick: () => void;
   onRecipeClick: (recipe: Recipe) => void;
+  onSettingsClick: () => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClick, onRecipeClick }) => {
+export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClick, onRecipeClick, onSettingsClick }) => {
   const [activeCategory, setActiveCategory] = useState<string>('全部');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -28,8 +29,16 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
       {/* Header Area */}
       <div className="px-6 pt-2 pb-2 bg-[#f2f4f6] sticky top-0 z-10">
         
-        {/* App Title (Restored) */}
-        <h1 className="text-[17px] font-bold text-center py-3 text-[#1a472a] tracking-tight">ChefNote</h1>
+        {/* App Title & Settings */}
+        <div className="relative py-3 flex items-center justify-center">
+             <h1 className="text-[17px] font-bold text-[#1a472a] tracking-tight">ChefNote</h1>
+             <button 
+                onClick={onSettingsClick}
+                className="absolute right-0 p-2 text-gray-400 hover:text-[#1a472a] transition-colors active:scale-90"
+             >
+                 <Settings size={20} />
+             </button>
+        </div>
 
         {/* Search Bar & Order Button Row (Resized & Compact) */}
         <div className="flex gap-3 mb-5 items-center">

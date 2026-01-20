@@ -26,6 +26,11 @@ if (!apiKey) {
 }
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
+// Ark (Volcengine) Config
+const ARK_API_KEY = process.env.ARK_API_KEY || '3b42a72d-bd69-412f-bed2-21cc55b03aca';
+const ARK_VIDEO_URL = 'https://ark.cn-beijing.volces.com/api/v3/video/generations';
+const ARK_TASK_URL = 'https://ark.cn-beijing.volces.com/api/v3/tasks'; // Generic task endpoint check
+
 // Middleware
 app.use(cors()); 
 app.use(express.json({ limit: '50mb' }) as any);
@@ -35,6 +40,12 @@ app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
+
+// Helper to get text model from DB
+const getTextModel = () => {
+  const settings = db.get('settings').value();
+  return settings?.aiModel || 'gemini-3-flash-preview';
+};
 
 // Routes
 
@@ -115,6 +126,31 @@ app.put('/api/categories', (req, res) => {
   }
 });
 
+// 7. Get Settings
+app.get('/api/settings', (req, res) => {
+  try {
+    const settings = db.get('settings').value() || { aiModel: 'gemini-3-flash-preview' };
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+// 8. Update Settings
+app.put('/api/settings', (req, res) => {
+  try {
+    const updates = req.body;
+    // Merge updates with existing settings (or defaults)
+    const current = db.get('settings').value() || { aiModel: 'gemini-3-flash-preview' };
+    const newSettings = { ...current, ...updates };
+    
+    db.set('settings', newSettings).write();
+    res.json(newSettings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
 // --- AI Routes ---
 
 app.post('/api/ai/recommend-menu', async (req, res) => {
@@ -123,7 +159,8 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
       return;
   }
   try {
-      console.log('AI Request: Recommend Menu');
+      const modelName = getTextModel();
+      console.log(`AI Request: Recommend Menu (Model: ${modelName})`);
       const { recipes, peopleCount } = req.body;
       if (!recipes || !peopleCount) {
            res.status(400).json({ error: 'Missing recipes or peopleCount' });
@@ -155,7 +192,7 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
       `;
 
       const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview', 
+          model: modelName, 
           contents: prompt,
           config: { 
               responseMimeType: "application/json",
@@ -187,7 +224,8 @@ app.post('/api/ai/generate-menu', async (req, res) => {
         return;
     }
     try {
-        console.log('AI Request: Generate Menu Theme');
+        const modelName = getTextModel();
+        console.log(`AI Request: Generate Menu Theme (Model: ${modelName})`);
         const { recipes, selectedIds } = req.body;
         if (!recipes || !selectedIds) {
              res.status(400).json({ error: 'Missing recipes or selectedIds' });
@@ -210,7 +248,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview', 
+            model: modelName, 
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
@@ -241,7 +279,8 @@ app.post('/api/ai/generate-prep', async (req, res) => {
         return;
     }
     try {
-        console.log('AI Request: Generate Prep List');
+        const modelName = getTextModel();
+        console.log(`AI Request: Generate Prep List (Model: ${modelName})`);
         const { recipes, selectedIds } = req.body;
         if (!recipes || !selectedIds) {
              res.status(400).json({ error: 'Missing recipes or selectedIds' });
@@ -258,7 +297,7 @@ app.post('/api/ai/generate-prep', async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: modelName,
             contents: prompt,
         });
         res.json({ text: response.text });
@@ -274,7 +313,7 @@ app.post('/api/ai/optimize-image', async (req, res) => {
       return;
   }
   try {
-      console.log('AI Request: Optimize Image');
+      console.log('AI Request: Optimize Image (Model: gemini-2.5-flash-image)');
       const { image } = req.body; // Base64 string
       if (!image) {
            res.status(400).json({ error: 'Missing image data' });
@@ -299,7 +338,7 @@ app.post('/api/ai/optimize-image', async (req, res) => {
       const prompt = "Enhance this food photo. Make it look like professional high-end food photography with warm lighting, appetizing glossy texture, and studio quality. Significantly improve the color grading, contrast and sharpness to make it mouth-watering.";
 
       const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image', // Switch to 2.5 flash image for better editing stability
+          model: 'gemini-2.5-flash-image', // Fixed model for image editing
           contents: {
             parts: [
               {
@@ -343,6 +382,114 @@ app.post('/api/ai/optimize-image', async (req, res) => {
       console.error('AI Optimize Image Error:', error);
       res.status(500).json({ error: error.message || 'Failed to optimize image' });
   }
+});
+
+// --- Doubao (Ark) Video Generation ---
+app.post('/api/ai/animate-image', async (req, res) => {
+    if (!ARK_API_KEY) {
+        res.status(503).json({ error: 'Ark API Key not configured' });
+        return;
+    }
+    
+    console.log('Ark Request: Animate Image (doubao-seedance-1-0-lite-i2v-250428)');
+    const { image } = req.body;
+
+    if (!image) {
+        res.status(400).json({ error: 'Missing image data' });
+        return;
+    }
+
+    try {
+        // 1. Submit Async Task
+        const submitResponse = await fetch(ARK_VIDEO_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${ARK_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'doubao-seedance-1-0-lite-i2v-250428',
+                video_source: {
+                    image: {
+                        type: 'base64',
+                        content: image.split(',')[1] || image // Strip prefix if present
+                    }
+                },
+                // Optional: Provide a prompt to guide motion
+                prompt: "Cinematic slow motion, appetizing food, steam rising, high quality, 4k",
+                ratio: "1:1" // Try to keep square like cover
+            })
+        });
+
+        if (!submitResponse.ok) {
+            const err = await submitResponse.text();
+            console.error('Ark Submit Error:', err);
+            throw new Error(`Ark API Error: ${submitResponse.status} ${submitResponse.statusText}`);
+        }
+
+        const submitData = await submitResponse.json();
+        const taskId = submitData.id || (submitData.data && submitData.data.id);
+        
+        if (!taskId) {
+             throw new Error("No Task ID returned from Ark");
+        }
+        
+        console.log(`Ark Task Submitted: ${taskId}, polling for result...`);
+
+        // 2. Poll for Status (Server-side polling to simplify client)
+        let attempts = 0;
+        const maxAttempts = 30; // 30 * 2s = 60s timeout
+        let videoUrl = null;
+
+        while (attempts < maxAttempts) {
+            await new Promise(r => setTimeout(r, 2000)); // Wait 2s
+            attempts++;
+
+            const statusResponse = await fetch(`${ARK_TASK_URL}/${taskId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${ARK_API_KEY}`
+                }
+            });
+
+            if (!statusResponse.ok) continue;
+
+            const statusData = await statusResponse.json();
+            // Check status structure (Ark standard: result.status or data.status)
+            // Typically: { result: { status: 'SUCCEEDED', output: ... } }
+            // Or new API: { status: 'SUCCEEDED', result: ... }
+            const status = statusData.status || (statusData.result && statusData.result.status);
+            
+            console.log(`Polling attempt ${attempts}: ${status}`);
+
+            if (status === 'SUCCEEDED' || status === 'SUCCESS') {
+                // Extract video URL
+                // Common structure: result.video.url or result.output.video_url
+                const result = statusData.result || statusData.data;
+                if (result && result.video && result.video.url) {
+                    videoUrl = result.video.url;
+                } else if (result && result.output && result.output.video_url) {
+                     videoUrl = result.output.video_url;
+                } else if (result && result.resp && result.resp.video_url) {
+                    // Seedance specific output might vary
+                    videoUrl = result.resp.video_url;
+                }
+                break;
+            } else if (status === 'FAILED' || status === 'CANCELLED') {
+                throw new Error(`Video generation failed: ${JSON.stringify(statusData)}`);
+            }
+        }
+
+        if (videoUrl) {
+            res.json({ videoUrl });
+        } else {
+            throw new Error("Video generation timed out or returned no URL");
+        }
+
+    } catch (error: any) {
+        console.error('Ark Animate Error:', error);
+        res.status(500).json({ error: error.message || 'Failed to animate image' });
+    }
 });
 
 // Start Server with Graceful Shutdown

@@ -18,13 +18,22 @@ interface Recipe {
   createdAt: number;
 }
 
+interface Settings {
+  aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025';
+}
+
 interface DatabaseSchema {
   recipes: Recipe[];
   categories: string[];
+  settings: Settings;
 }
 
 // Initial Data
 const INITIAL_CATEGORIES = ['炒菜', '炖菜', '清蒸', '甜品', '凉菜', '汤羹', '其他'];
+const INITIAL_SETTINGS: Settings = {
+  aiModel: 'gemini-3-flash-preview'
+};
+
 const MOCK_RECIPES: Recipe[] = [
   {
     id: '1',
@@ -66,7 +75,11 @@ function tryInitializeDb(filePath: string): any {
     }
     const adapter = new FileSync<DatabaseSchema>(filePath);
     const db = (low as any)(adapter);
-    db.defaults({ recipes: MOCK_RECIPES, categories: INITIAL_CATEGORIES }).write();
+    db.defaults({ 
+      recipes: MOCK_RECIPES, 
+      categories: INITIAL_CATEGORIES,
+      settings: INITIAL_SETTINGS
+    }).write();
     console.log(`Database initialized successfully at: ${filePath}`);
     return db;
   } catch (error) {
@@ -77,31 +90,38 @@ function tryInitializeDb(filePath: string): any {
 
 let db: any;
 
-// Strategy 1: Railway Volume (if configured)
-// Use process.env['RAILWAY_VOLUME_MOUNT_PATH'] to be safe with types if needed
-const railwayPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
-  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json') 
-  : null;
+// Strategy 1: Environment Variable (DATA_DIR) - Recommended for Zeabur/Docker
+// We look for a 'db.json' inside the configured data directory
+if (process.env.DATA_DIR) {
+  const envPath = path.join(process.env.DATA_DIR, 'db.json');
+  console.log(`Attempting to use DATA_DIR volume at: ${envPath}`);
+  db = tryInitializeDb(envPath);
+}
 
-if (railwayPath) {
+// Strategy 2: Railway Volume (Legacy support)
+if (!db && process.env.RAILWAY_VOLUME_MOUNT_PATH) {
+  const railwayPath = path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'db.json');
   console.log(`Attempting to use Railway Volume at: ${railwayPath}`);
   db = tryInitializeDb(railwayPath);
 }
 
-// Strategy 2: Local File (Fallback)
-// Use (process as any).cwd() to ensure it works in various TS environments
+// Strategy 3: Local File (Fallback for local dev)
 if (!db) {
   const localPath = path.join((process as any).cwd(), 'db.json');
   console.log(`Attempting to use local file at: ${localPath}`);
   db = tryInitializeDb(localPath);
 }
 
-// Strategy 3: In-Memory (Last Resort to keep server alive)
+// Strategy 4: In-Memory (Last Resort)
 if (!db) {
   console.warn('CRITICAL: File storage failed. Falling back to In-Memory database. Data will be lost on restart.');
   const adapter = new Memory<DatabaseSchema>('db');
   db = (low as any)(adapter);
-  db.defaults({ recipes: MOCK_RECIPES, categories: INITIAL_CATEGORIES }).write();
+  db.defaults({ 
+    recipes: MOCK_RECIPES, 
+    categories: INITIAL_CATEGORIES,
+    settings: INITIAL_SETTINGS 
+  }).write();
 }
 
 export default db;

@@ -5,6 +5,7 @@ import { OrderMode } from './components/OrderMode';
 import { Navbar } from './components/Navbar';
 import { CategoryManager } from './components/CategoryManager';
 import { RecipeDetail } from './components/RecipeDetail';
+import { Settings } from './components/Settings';
 import { Recipe, ViewState } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
@@ -154,6 +155,7 @@ const App: React.FC = () => {
             categories={categories}
             onOrderModeClick={() => navigateTo('ORDER_MODE', 1)}
             onRecipeClick={handleRecipeClick}
+            onSettingsClick={() => navigateTo('SETTINGS', 1)}
           />
         );
       case 'ADD_RECIPE':
@@ -203,6 +205,12 @@ const App: React.FC = () => {
             onShowToast={showToast}
           />
         ) : null;
+      case 'SETTINGS':
+        return (
+          <Settings 
+            onBack={() => navigateTo('HOME', -1)}
+          />
+        );
       default:
         return null;
     }
