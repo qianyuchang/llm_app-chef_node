@@ -498,7 +498,7 @@ app.post('/api/ai/optimize-image', async (req, res) => {
             contents: {
                 parts: [
                     { inlineData: { data: base64Data, mimeType: mimeType } },
-                    { text: 'Enhance this food photo to look professional, appetizing, and high-end. Adjust lighting, contrast, and color vibrancy while keeping the original dish structure perfectly intact. Return the modified image.' },
+                    { text: 'Retouch this food image to match the style of high-end social media food photography (like XiaoHongShu). Apply a "Warm & Glossy" filter: boost warm tones (golden/orange), increase contrast for depth, enhance the oily gloss ("锅气") on the food surface, and apply soft cinematic lighting. Sharpen details. CRITICAL: Keep the original food structure and plating 100% unchanged. Do not add or remove items. Return the image with these enhancements.' },
                 ],
             },
         });
