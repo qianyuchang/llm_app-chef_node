@@ -371,7 +371,11 @@ app.post('/api/ai/generate-menu', async (req, res) => {
   const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
 
   // Determine season for poetic context
-  const month = new Date().getMonth() + 1;
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const dateStr = `${month}月${day}日`;
+
   let season = 'Winter';
   if (month >= 3 && month <= 5) season = 'Spring';
   else if (month >= 6 && month <= 8) season = 'Summer';
@@ -379,6 +383,7 @@ app.post('/api/ai/generate-menu', async (req, res) => {
 
   const prompt = `
       Create a highly poetic and visually distinct menu theme for these dishes: ${selectedRecipes.map((r: any) => r.title).join(', ')}.
+      Current Date: ${dateStr}.
       Current Season: ${season}.
       
       Required Fields:
@@ -386,7 +391,13 @@ app.post('/api/ai/generate-menu', async (req, res) => {
       - description: A short, elegant description in Chinese (approx 15 words).
       - idiom: A 3-character artistic phrase or idiom that captures the soul of the meal (e.g. 寻味集, 慢生活, 悦己食).
       - themeColor: You MUST choose the most appropriate color based on the actual ingredients.
-      - seasonalPhrase: A very concise, highly artistic and poetic Chinese sentence (max 12 characters) reflecting the CURRENT SEASON (${season}) and mood. It will be placed at the bottom of the menu. (e.g. "晚来天欲雪，能饮一杯无", "人间至味是清欢", "且将新火试新茶").
+      - seasonalPhrase: A very concise, highly artistic, and warm Chinese sentence (max 14 characters) to be placed at the bottom.
+        
+      Rules for 'seasonalPhrase':
+        1. It does NOT need to describe the food. It should be a "Life Quote" or "Mood".
+        2. IF today (${dateStr}) is close to a major Chinese Festival (e.g., New Year, Mid-Autumn, Valentine's, etc.), you MUST reference that festival atmosphere.
+        3. If no festival, strictly use the season (${season}) or a philosophical life sentiment (e.g., about time, gathering, or simple joy).
+        4. Examples: "家人闲坐，灯火可亲", "岁岁常欢愉，年年皆胜意", "人间烟火气，最抚凡人心".
       
       CRITICAL COLOR RULES:
       - "red": Spicy (chili), bold meats, festive, or hot pots.

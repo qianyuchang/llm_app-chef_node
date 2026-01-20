@@ -275,8 +275,23 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
 
       {/* Masonry Grid with 2-Column Flexbox */}
       <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
-        {/* Search Status */}
-        {aiRecipeIds !== null && (
+        {/* Search Status & AI Loading */}
+        {isAiSearching && (
+             <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-500">
+                 <div className="relative">
+                    <Loader2 size={36} className="text-[#385c44] animate-spin" />
+                    <Sparkles size={16} className="text-yellow-400 absolute -top-1 -right-2 animate-pulse" />
+                 </div>
+                 <p className="mt-4 text-sm text-gray-500 font-medium">AI 正在翻阅菜谱...</p>
+                 <div className="flex gap-3 mt-6 w-full max-w-xs opacity-50">
+                    <div className="flex-1 h-32 bg-gray-200 rounded-2xl animate-pulse"></div>
+                    <div className="flex-1 h-24 bg-gray-200 rounded-2xl animate-pulse"></div>
+                 </div>
+             </div>
+        )}
+
+        {/* Active Search Filters */}
+        {!isAiSearching && aiRecipeIds !== null && (
              <div className="mb-4 flex items-center justify-between px-1">
                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#385c44] bg-[#385c44]/10 px-3 py-1.5 rounded-full">
                      <Sparkles size={12} />
@@ -288,28 +303,31 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
              </div>
         )}
 
-        {filteredRecipes.length > 0 ? (
-          <div className="flex gap-4 items-start">
-            <div className="flex-1 min-w-0 flex flex-col gap-4">
-              {leftColRecipes.map(renderRecipeCard)}
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-4">
-              {rightColRecipes.map(renderRecipeCard)}
-            </div>
-          </div>
-        ) : (
-          /* Empty State */
-          <div className="flex flex-col items-center justify-center pt-24 text-center px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm">
-                <Sparkles size={32} className="text-[#385c44]/40" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-3">没有找到相关菜谱</h3>
-            <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-              {aiRecipeIds !== null ? "AI 挠破了头也没找到..." : "也许它正等着你亲自下厨"}
-              <br />
-              <span className="text-[#385c44] font-medium mt-1 inline-block">去创造第一个定义美味的人吧！</span>
-            </p>
-          </div>
+        {/* Results */}
+        {!isAiSearching && (
+            filteredRecipes.length > 0 ? (
+              <div className="flex gap-4 items-start">
+                <div className="flex-1 min-w-0 flex flex-col gap-4">
+                  {leftColRecipes.map(renderRecipeCard)}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col gap-4">
+                  {rightColRecipes.map(renderRecipeCard)}
+                </div>
+              </div>
+            ) : (
+              /* Empty State */
+              <div className="flex flex-col items-center justify-center pt-24 text-center px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm">
+                    <Sparkles size={32} className="text-[#385c44]/40" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800 mb-3">没有找到相关菜谱</h3>
+                <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
+                  {aiRecipeIds !== null ? "AI 挠破了头也没找到..." : "也许它正等着你亲自下厨"}
+                  <br />
+                  <span className="text-[#385c44] font-medium mt-1 inline-block">去创造第一个定义美味的人吧！</span>
+                </p>
+              </div>
+            )
         )}
       </div>
     </div>

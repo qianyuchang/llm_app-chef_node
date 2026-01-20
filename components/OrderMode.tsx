@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2, Users, Bot, AlertTriangle, Copy } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Recipe } from '../types';
@@ -23,8 +23,16 @@ interface MenuThemeData {
 }
 
 export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBack, onShowToast }) => {
-  const [activeCategory, setActiveCategory] = useState<string>('全部');
+  // Navigation State
+  const [activeCategory, setActiveCategory] = useState<string>(categories[0] || '全部');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isClickScrolling = useRef(false); // Flag to prevent scroll events from overriding click selection
+
+  // Cart State
   const [cart, setCart] = useState<Record<string, number>>({});
+  
+  // Menu Gen State
   const [isGenerating, setIsGenerating] = useState(false);
   const [prepResult, setPrepResult] = useState<string | null>(null);
   const [menuTheme, setMenuTheme] = useState<MenuThemeData | null>(null);
@@ -41,6 +49,54 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
+
+  // --- Scroll Spy Logic ---
+  useEffect(() => {
+    const handleScroll = () => {
+        if (isClickScrolling.current) return;
+        if (!scrollContainerRef.current) return;
+
+        const containerTop = scrollContainerRef.current.scrollTop + scrollContainerRef.current.offsetTop;
+        const offset = 100; // Offset to trigger change slightly before hitting top
+
+        // Find the category section closest to the top
+        let currentCat = categories[0];
+        for (const cat of categories) {
+            const el = categoryRefs.current[cat];
+            if (el) {
+                // If element top is above the threshold line
+                if (el.offsetTop - scrollContainerRef.current.offsetTop <= scrollContainerRef.current.scrollTop + offset) {
+                    currentCat = cat;
+                }
+            }
+        }
+        
+        if (currentCat !== activeCategory) {
+            setActiveCategory(currentCat);
+        }
+    };
+
+    const container = scrollContainerRef.current;
+    if (container) {
+        container.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+        if (container) container.removeEventListener('scroll', handleScroll);
+    };
+  }, [categories, activeCategory]);
+
+  const scrollToCategory = (cat: string) => {
+      setActiveCategory(cat);
+      const el = categoryRefs.current[cat];
+      if (el) {
+          isClickScrolling.current = true;
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Reset flag after animation duration roughly
+          setTimeout(() => {
+              isClickScrolling.current = false;
+          }, 500);
+      }
+  };
 
   const isSelected = (id: string): boolean => {
     return !!cart[id];
@@ -161,8 +217,6 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
         if (!blob) throw new Error('Failed to generate image');
 
         // PWA / Mobile Sharing Strategy
-        // If navigator.share is supported (standard on iOS/Android), use it to share the file directly.
-        // This is much more reliable in PWA mode than a download link.
         if (navigator.share && navigator.canShare) {
             const file = new File([blob], `menu-${Date.now()}.png`, { type: 'image/png' });
             if (navigator.canShare({ files: [file] })) {
@@ -189,12 +243,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
     }
   };
 
-  // Group recipes by category or show filtered list
-  const displayRecipes = activeCategory === '全部' 
-    ? recipes 
-    : recipes.filter(r => r.category === activeCategory);
-
-  // Group selected recipes by their ACTUAL category
+  // Group selected recipes by their ACTUAL category for the menu card
   const groupedMenu = selectedRecipes.reduce((acc, recipe) => {
     if (!acc[recipe.category]) acc[recipe.category] = [];
     acc[recipe.category].push(recipe);
@@ -267,19 +316,10 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <div className="w-24 bg-[#f7f8fa] overflow-y-auto no-scrollbar pb-32 border-r border-gray-100">
-          <button
-             onClick={() => setActiveCategory('全部')}
-             className={`w-full py-4 text-xs font-medium relative transition-colors ${activeCategory === '全部' ? 'bg-white text-[#1a472a] font-bold' : 'text-gray-500'}`}
-          >
-            {activeCategory === '全部' && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-[#1a472a] rounded-r-full"></div>
-            )}
-            全部
-          </button>
           {categories.map(cat => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => scrollToCategory(cat)}
               className={`w-full py-4 text-xs font-medium relative transition-colors ${activeCategory === cat ? 'bg-white text-[#1a472a] font-bold' : 'text-gray-500'}`}
             >
                {activeCategory === cat && (
@@ -294,58 +334,74 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
           ))}
         </div>
 
-        {/* Recipe List */}
-        <div className="flex-1 overflow-y-auto pb-32 p-4">
-            <h2 className="text-xs font-bold text-gray-400 mb-4 pl-1">{activeCategory}</h2>
-            <div className="space-y-6">
-                {displayRecipes.map(recipe => {
-                    const selected = isSelected(recipe.id);
-                    const cookCount = recipe.logs ? recipe.logs.length : 0;
-                    
-                    return (
-                        <div 
-                            key={recipe.id} 
-                            onClick={() => toggleSelection(recipe.id)}
-                            className={`flex gap-3 group p-2 rounded-2xl transition-all cursor-pointer border ${selected ? 'bg-[#1a472a]/5 border-[#1a472a]/20' : 'bg-transparent border-transparent hover:bg-gray-50'}`}
-                        >
-                            <img 
-                                src={recipe.coverImage} 
-                                alt={recipe.title} 
-                                className="w-20 h-20 rounded-xl object-cover bg-gray-100 shrink-0 shadow-sm"
-                            />
-                            <div className="flex-1 flex flex-col justify-between py-1">
-                                <div>
-                                    <h3 className={`font-bold text-sm ${selected ? 'text-[#1a472a]' : 'text-gray-800'}`}>{recipe.title}</h3>
-                                    {/* Mock tags - Fixed vertical alignment */}
-                                    <div className="flex gap-1 mt-1.5">
-                                        <span className="inline-flex items-center justify-center text-[10px] bg-white text-gray-400 px-1.5 py-0.5 rounded-md border border-gray-100 leading-none">
-                                            <span className="pt-[1px]">{recipe.category}</span>
-                                        </span>
+        {/* Recipe List - Right Side - All items visible */}
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32 p-4 scroll-smooth">
+            {categories.map(cat => {
+                const categoryRecipes = recipes.filter(r => r.category === cat);
+                if (categoryRecipes.length === 0) return null;
+
+                return (
+                    <div 
+                        key={cat} 
+                        ref={(el) => { categoryRefs.current[cat] = el; }}
+                        className="mb-8 scroll-mt-4"
+                    >
+                        <h2 className="text-xs font-bold text-gray-400 mb-4 pl-1 sticky top-0 bg-white/95 backdrop-blur-sm py-2 z-10">{cat}</h2>
+                        <div className="space-y-6">
+                            {categoryRecipes.map(recipe => {
+                                const selected = isSelected(recipe.id);
+                                const cookCount = recipe.logs ? recipe.logs.length : 0;
+                                
+                                return (
+                                    <div 
+                                        key={recipe.id} 
+                                        onClick={() => toggleSelection(recipe.id)}
+                                        className={`flex gap-3 group p-2 rounded-2xl transition-all cursor-pointer border ${selected ? 'bg-[#1a472a]/5 border-[#1a472a]/20' : 'bg-transparent border-transparent hover:bg-gray-50'}`}
+                                    >
+                                        <img 
+                                            src={recipe.coverImage} 
+                                            alt={recipe.title} 
+                                            className="w-20 h-20 rounded-xl object-cover bg-gray-100 shrink-0 shadow-sm"
+                                        />
+                                        <div className="flex-1 flex flex-col justify-between py-1">
+                                            <div>
+                                                <h3 className={`font-bold text-sm ${selected ? 'text-[#1a472a]' : 'text-gray-800'}`}>{recipe.title}</h3>
+                                                {/* Mock tags */}
+                                                <div className="flex gap-1 mt-1.5">
+                                                    <span className="inline-flex items-center justify-center text-[10px] bg-white text-gray-400 px-1.5 py-0.5 rounded-md border border-gray-100 leading-none">
+                                                        <span className="pt-[1px]">{recipe.category}</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium text-xs text-[#1a472a]">
+                                                        {PROFICIENCY_TEXT[recipe.proficiency]}
+                                                    </span>
+                                                    {cookCount > 0 && (
+                                                        <span className="flex items-center text-[10px] text-orange-500 font-bold bg-orange-50 px-1.5 py-0.5 rounded-md border border-orange-100">
+                                                            <Flame size={10} fill="currentColor" className="mr-0.5" />
+                                                            {cookCount}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Selection Toggle */}
+                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${selected ? 'bg-[#1a472a] text-white shadow-md scale-110' : 'border-2 border-gray-200 text-transparent'}`}>
+                                                    <CheckCircle2 size={16} className={selected ? 'block' : 'hidden'} />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium text-xs text-[#1a472a]">
-                                            {PROFICIENCY_TEXT[recipe.proficiency]}
-                                        </span>
-                                        {cookCount > 0 && (
-                                            <span className="flex items-center text-[10px] text-orange-500 font-bold bg-orange-50 px-1.5 py-0.5 rounded-md border border-orange-100">
-                                                <Flame size={10} fill="currentColor" className="mr-0.5" />
-                                                {cookCount}
-                                            </span>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Selection Toggle */}
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${selected ? 'bg-[#1a472a] text-white shadow-md scale-110' : 'border-2 border-gray-200 text-transparent'}`}>
-                                        <CheckCircle2 size={16} className={selected ? 'block' : 'hidden'} />
-                                    </div>
-                                </div>
-                            </div>
+                                );
+                            })}
                         </div>
-                    );
-                })}
-            </div>
+                    </div>
+                );
+            })}
+            
+            {/* Bottom spacer for FAB */}
+            <div className="h-16"></div>
         </div>
       </div>
 
