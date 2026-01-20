@@ -449,7 +449,8 @@ app.post('/api/ai/generate-image', async (req, res) => {
                 body: JSON.stringify({
                     model: modelName,
                     prompt: prompt,
-                    size: '768x1024' // 3:4 for vertical covers
+                    // FIX: Doubao requires at least 3.6M pixels for Seedream. "2K" is a supported preset string.
+                    size: '2K' 
                 })
             });
             if (!arkRes.ok) {
@@ -497,11 +498,6 @@ app.post('/api/ai/optimize-image', async (req, res) => {
             // Doubao (Volcengine) Image-to-Image implementation
             console.log("Using Doubao Img2Img...");
             
-            // Note: The 'image' field in Ark API typically expects binary_data_base64 or a URL. 
-            // Since we have local base64, we will try to pass the raw base64 string.
-            // Some proxies/SDKs expect 'image_base64' or similar. 
-            // Based on user feedback: "image": "url" or possibly base64 string.
-            
             const arkRes = await fetch(ARK_IMAGE_URL, {
                 method: 'POST',
                 headers: { 
@@ -512,12 +508,11 @@ app.post('/api/ai/optimize-image', async (req, res) => {
                     model: modelName,
                     // Use Chinese prompt for Doubao as it works better natively
                     prompt: "保持原有构图和食物主体，优化光影、色调和质感，使其具有高级美食摄影风格，增加暖色调和光泽感（锅气）。锐化细节，提升食欲感。",
-                    image: base64Data, // Sending raw base64 string as 'image' value
-                    // Try to request a standard square size if not specified, 
-                    // though for Img2Img usually size should match input or scale.
-                    // Doubao supports: 1024x1024, 768x1024 etc. We try to be safe with 1024x1024.
-                    size: '1024x1024', 
-                    strength: 0.65 // 0-1, higher means more change. 0.65 preserves structure but allows lighting fix.
+                    // FIX: Doubao requires full Data URI string (e.g. "data:image/png;base64,...") for image inputs
+                    image: image, 
+                    // FIX: Ensure size meets pixel requirement (>3.6M pixels) by using "2K" preset
+                    size: '2K', 
+                    strength: 0.65 
                 })
             });
 
