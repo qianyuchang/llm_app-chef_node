@@ -346,7 +346,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                         ref={(el) => { categoryRefs.current[cat] = el; }}
                         className="mb-8 scroll-mt-4"
                     >
-                        <h2 className="text-xs font-bold text-gray-400 mb-4 pl-1 sticky top-0 bg-white/95 backdrop-blur-sm py-2 z-10">{cat}</h2>
+                        <h2 className="text-xs font-bold text-gray-400 mb-4 pl-1">{cat}</h2>
                         <div className="space-y-6">
                             {categoryRecipes.map(recipe => {
                                 const selected = isSelected(recipe.id);
