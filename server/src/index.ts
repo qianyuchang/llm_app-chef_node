@@ -28,6 +28,9 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Ark (Volcengine) Config
 const ARK_API_KEY = process.env.ARK_API_KEY || '3b42a72d-bd69-412f-bed2-21cc55b03aca';
+// CRITICAL: Chat completion requires an Endpoint ID (e.g. ep-2024...), NOT a model name.
+const ARK_ENDPOINT_ID = process.env.ARK_ENDPOINT_ID; 
+
 const ARK_IMAGE_URL = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
 const ARK_CHAT_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
@@ -41,6 +44,8 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- Helpers ---
+
 // Helper to get text model from DB
 const getTextModel = () => {
   const settings = db.get('settings').value();
@@ -53,7 +58,51 @@ const getImageModel = () => {
     return settings?.imageModel || 'doubao-seedream-4-5-251128';
 };
 
-// Routes
+/**
+ * Robust JSON Parser for AI Responses
+ * AI models often wrap JSON in Markdown code blocks (```json ... ```) or add conversational text.
+ * This function attempts to extract and parse the JSON object.
+ */
+const safeJsonParse = (text: string) => {
+  if (!text) throw new Error("Empty AI response");
+  
+  // 1. Try direct parse first
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Continue to cleanup strategies
+  }
+
+  // 2. Remove Markdown code blocks (```json ... ``` or ``` ... ```)
+  let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    // Continue to substring strategy
+  }
+
+  // 3. Find the first '{' and the last '}' to handle conversational prefixes/suffixes
+  const firstOpen = clean.indexOf('{');
+  const lastClose = clean.lastIndexOf('}');
+  
+  if (firstOpen !== -1 && lastClose !== -1) {
+    const jsonSubstring = clean.substring(firstOpen, lastClose + 1);
+    try {
+      return JSON.parse(jsonSubstring);
+    } catch (e) {
+      console.error("Failed to parse extracted JSON substring:", jsonSubstring);
+      // Fall through to error
+    }
+  }
+
+  // If we reach here, parsing failed. Include raw text for debugging.
+  // We limit the raw text length to prevent excessively large error headers.
+  const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
+  throw new Error(`JSON Parse Failed. Raw Output: ${preview}`);
+};
+
+// --- Routes ---
 
 // 1. Health Check - Critical for Railway
 app.get('/', (req, res) => {
@@ -191,13 +240,20 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
       ${JSON.stringify(recipes.map((r: any) => ({ id: r.id, title: r.title, category: r.category, ingredients: r.ingredients })))}
 
       Return a JSON object containing an array of selected recipe IDs.
-      IMPORTANT: Return ONLY valid JSON.
+      IMPORTANT: Return ONLY valid JSON. Do NOT use Markdown code blocks.
   `;
 
   try {
       if (modelName.startsWith('doubao')) {
           if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
           
+          // Use Endpoint ID if available, otherwise fallback to model name (which will likely 404)
+          const targetModel = ARK_ENDPOINT_ID || modelName;
+          
+          if (!ARK_ENDPOINT_ID) {
+              console.warn('WARNING: ARK_ENDPOINT_ID is not set. Ark API requires an Endpoint ID (ep-xxxx), not a model name. Request will likely fail with 404.');
+          }
+
           const arkRes = await fetch(ARK_CHAT_URL, {
               method: 'POST',
               headers: {
@@ -205,16 +261,24 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
                   'Authorization': `Bearer ${ARK_API_KEY}`
               },
               body: JSON.stringify({
-                  model: modelName, // e.g. doubao-1-5-pro-32k-250115
+                  model: targetModel, 
                   messages: [{ role: 'user', content: prompt }],
-                  response_format: { type: 'json_object' } // Ensure JSON output if supported
+                  // Note: Some Doubao endpoints might ignore this or still return markdown
+                  response_format: { type: 'json_object' } 
               })
           });
           
-          if (!arkRes.ok) throw new Error(`Ark API Error: ${arkRes.status}`);
+          if (!arkRes.ok) {
+              const errText = await arkRes.text();
+              console.error('Ark API Error Body:', errText);
+              throw new Error(`Ark API Error: ${arkRes.status} ${arkRes.statusText} - ${errText}`);
+          }
           const data = await arkRes.json();
           const content = data.choices[0].message.content;
-          res.json(JSON.parse(content));
+          console.log("Doubao Raw Response:", content);
+          
+          // Use robust parser
+          res.json(safeJsonParse(content));
 
       } else {
           // Gemini
@@ -239,11 +303,12 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
                   }
               }
           });
-          const json = JSON.parse(response.text || '{}');
-          res.json(json);
+          // Use robust parser even for Gemini, just in case
+          res.json(safeJsonParse(response.text || '{}'));
       }
   } catch (error: any) {
       console.error('AI Recommend Menu Error:', error);
+      // Return the error message to frontend for debugging
       res.status(500).json({ error: error.message || 'Failed to recommend menu' });
   }
 });
@@ -271,12 +336,19 @@ app.post('/api/ai/generate-menu', async (req, res) => {
         - It MUST be a poetic, seasonal, or atmospheric sentence reflecting the mood (e.g., "The autumn breeze is refreshing," "A joyful gathering for the New Year," "Simple flavors of home").
         - Keep it elegant and brief (under 20 words).
         
-        Return a JSON object.
+        Return a JSON object. Do NOT use Markdown code blocks.
     `;
 
     try {
         if (modelName.startsWith('doubao')) {
              if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
+
+             // Use Endpoint ID if available, otherwise fallback to model name
+             const targetModel = ARK_ENDPOINT_ID || modelName;
+
+             if (!ARK_ENDPOINT_ID) {
+                console.warn('WARNING: ARK_ENDPOINT_ID is not set. Ark API requires an Endpoint ID (ep-xxxx), not a model name. Request will likely fail with 404.');
+             }
 
              const arkRes = await fetch(ARK_CHAT_URL, {
                 method: 'POST',
@@ -285,15 +357,22 @@ app.post('/api/ai/generate-menu', async (req, res) => {
                     'Authorization': `Bearer ${ARK_API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: modelName,
+                    model: targetModel,
                     messages: [{ role: 'user', content: prompt }],
                     response_format: { type: 'json_object' }
                 })
             });
-            if (!arkRes.ok) throw new Error(`Ark API Error: ${arkRes.status}`);
+            if (!arkRes.ok) {
+                const errText = await arkRes.text();
+                console.error('Ark API Error Body:', errText);
+                throw new Error(`Ark API Error: ${arkRes.status} ${arkRes.statusText} - ${errText}`);
+            }
             const data = await arkRes.json();
             const content = data.choices[0].message.content;
-            res.json(JSON.parse(content));
+            console.log("Doubao Raw Response (Theme):", content);
+            
+            // Use robust parser
+            res.json(safeJsonParse(content));
 
         } else {
              if (!ai) { return res.status(503).json({ error: 'Gemini API Key not configured' }); }
@@ -315,8 +394,8 @@ app.post('/api/ai/generate-menu', async (req, res) => {
                     }
                 }
             });
-            const json = JSON.parse(response.text || '{}');
-            res.json(json);
+            // Use robust parser
+            res.json(safeJsonParse(response.text || '{}'));
         }
     } catch (error: any) {
         console.error('AI Generate Menu Error:', error);
@@ -348,6 +427,13 @@ app.post('/api/ai/generate-prep', async (req, res) => {
         if (modelName.startsWith('doubao')) {
              if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
              
+             // Use Endpoint ID if available, otherwise fallback to model name
+             const targetModel = ARK_ENDPOINT_ID || modelName;
+
+             if (!ARK_ENDPOINT_ID) {
+                console.warn('WARNING: ARK_ENDPOINT_ID is not set. Ark API requires an Endpoint ID (ep-xxxx), not a model name. Request will likely fail with 404.');
+             }
+
              const arkRes = await fetch(ARK_CHAT_URL, {
                 method: 'POST',
                 headers: {
@@ -355,11 +441,15 @@ app.post('/api/ai/generate-prep', async (req, res) => {
                     'Authorization': `Bearer ${ARK_API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: modelName,
+                    model: targetModel,
                     messages: [{ role: 'user', content: prompt }]
                 })
             });
-            if (!arkRes.ok) throw new Error(`Ark API Error: ${arkRes.status}`);
+            if (!arkRes.ok) {
+                const errText = await arkRes.text();
+                console.error('Ark API Error Body:', errText);
+                throw new Error(`Ark API Error: ${arkRes.status} ${arkRes.statusText} - ${errText}`);
+            }
             const data = await arkRes.json();
             const content = data.choices[0].message.content;
             res.json({ text: content });

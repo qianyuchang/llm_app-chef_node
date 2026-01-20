@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2, Users, Bot } from 'lucide-react';
+import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2, Users, Bot, AlertTriangle, Copy } from 'lucide-react';
 import { toBlob } from 'html-to-image';
 import { Recipe } from '../types';
 import { generateMenuTheme, recommendMenu } from '../services/geminiService';
@@ -34,6 +34,9 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const [peopleCount, setPeopleCount] = useState(2);
   const [isRecommending, setIsRecommending] = useState(false);
   const [aiLoadingText, setAiLoadingText] = useState('思考中...');
+  
+  // Debug/Error Modal State
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -62,6 +65,8 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const handleAiRecommendation = async () => {
       setIsRecommending(true);
       setAiLoadingText('思考中...');
+      setErrorDetail(null); // Clear previous errors
+
       try {
           // 1. Get Recommendations
           const result = await recommendMenu(recipes, peopleCount);
@@ -86,8 +91,10 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
 
               setShowAiModal(false);
           }
-      } catch (error) {
-          if (onShowToast) onShowToast("AI 推荐失败: " + (error as Error).message, 'error');
+      } catch (error: any) {
+          // Instead of just a toast, show the error modal so user can see raw output
+          setErrorDetail(error.message || "未知错误");
+          if (onShowToast) onShowToast("AI 推荐失败，请查看详情", 'error');
       } finally {
           setIsRecommending(false);
       }
@@ -96,12 +103,13 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
   const handleGenerateMenu = async () => {
     if (totalItems === 0) return;
     setIsGenerating(true);
+    setErrorDetail(null);
     try {
         const result = await generateMenuTheme(recipes, selectedRecipeIds);
         setMenuTheme(result);
-    } catch (error) {
-        if (onShowToast) onShowToast("生成失败: " + (error as Error).message, 'error');
-        console.error(error);
+    } catch (error: any) {
+        setErrorDetail(error.message || "生成失败");
+        if (onShowToast) onShowToast("生成失败，请查看详情", 'error');
     } finally {
         setIsGenerating(false);
     }
@@ -442,6 +450,43 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                                 开始生成
                             </>
                         )}
+                    </button>
+                </div>
+           </div>
+        </div>
+      )}
+
+      {/* Error Details Modal */}
+      {errorDetail && (
+        <div className="absolute inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+           <div className="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl flex flex-col max-h-[80vh]">
+                <div className="flex items-center gap-3 mb-4 text-red-600">
+                    <AlertTriangle size={24} />
+                    <h3 className="font-bold text-lg">生成失败</h3>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto bg-red-50 p-4 rounded-xl mb-4 border border-red-100">
+                    <p className="text-xs font-mono text-red-900 break-words whitespace-pre-wrap">
+                        {errorDetail}
+                    </p>
+                </div>
+
+                <div className="flex gap-3">
+                    <button 
+                        onClick={() => {
+                            navigator.clipboard.writeText(errorDetail);
+                            if (onShowToast) onShowToast("错误信息已复制", 'success');
+                        }}
+                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                    >
+                        <Copy size={16} />
+                        复制
+                    </button>
+                    <button 
+                        onClick={() => setErrorDetail(null)}
+                        className="flex-1 py-3 bg-[#1a472a] text-white rounded-xl font-bold text-sm shadow-lg shadow-green-900/20"
+                    >
+                        关闭
                     </button>
                 </div>
            </div>
