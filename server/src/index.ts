@@ -61,33 +61,23 @@ const getImageModel = () => {
 
 /**
  * Robust JSON Parser for AI Responses
- * AI models often wrap JSON in Markdown code blocks (```json ... ```) or add conversational text.
- * This function attempts to extract and parse the JSON object.
  */
 const safeJsonParse = (text: string) => {
   if (!text) throw new Error("Empty AI response");
   
-  // 1. Try direct parse first
   try {
     return JSON.parse(text);
-  } catch (e) {
-    // Continue to cleanup strategies
-  }
+  } catch (e) {}
 
-  // 2. Remove Markdown code blocks (```json ... ``` or ``` ... ```)
   let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
   
   try {
     return JSON.parse(clean);
-  } catch (e) {
-    // Continue to substring strategy
-  }
+  } catch (e) {}
 
-  // 3. Find the first '{' or '[' (for arrays) and the last '}' or ']'
   const firstOpenBrace = clean.indexOf('{');
   const firstOpenBracket = clean.indexOf('[');
   
-  // Determine which starts first to decide if it's an object or array
   let startIndex = -1;
   let endIndex = -1;
 
@@ -105,68 +95,48 @@ const safeJsonParse = (text: string) => {
       return JSON.parse(jsonSubstring);
     } catch (e) {
       console.error("Failed to parse extracted JSON substring:", jsonSubstring);
-      // Fall through to error
     }
   }
 
-  // If we reach here, parsing failed. Include raw text for debugging.
-  // We limit the raw text length to prevent excessively large error headers.
   const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
   throw new Error(`JSON Parse Failed. Raw Output: ${preview}`);
 };
 
 /**
  * Normalizes AI response for menu recommendation.
- * Ensures the output always contains `selectedIds`.
- * Handles:
- * 1. Raw Arrays: ["id1", "id2"] -> { selectedIds: ["id1", "id2"] }
- * 2. Wrong Keys: { "selected_recipes": [...] } -> { selectedIds: [...] }
  */
 const normalizeMenuResponse = (parsed: any) => {
     if (Array.isArray(parsed)) {
-        console.log("AI returned raw array. Normalizing to { selectedIds }.");
         return { selectedIds: parsed };
     }
     
     if (parsed && typeof parsed === 'object') {
-        // If 'selectedIds' is present and is an array, we are good.
         if (Array.isArray(parsed.selectedIds)) {
             return parsed;
         }
-
-        // Handle common key variations (Doubao often uses 'selected_recipes')
         const possibleKeys = ['selected_recipes', 'recipes', 'ids', 'dishes', 'menu'];
         for (const key of possibleKeys) {
             if (Array.isArray(parsed[key])) {
-                console.log(`AI returned object with key '${key}'. Mapping to 'selectedIds'.`);
                 return { ...parsed, selectedIds: parsed[key] };
             }
         }
-        
-        // Fallback: Find ANY key that holds an array of strings/numbers
         const keys = Object.keys(parsed);
         for (const key of keys) {
              const val = parsed[key];
-             // Check if it's an array and (empty OR contains string/number)
              if (Array.isArray(val) && (val.length === 0 || typeof val[0] === 'string' || typeof val[0] === 'number')) {
-                 console.log(`Found likely array candidate in key '${key}'. Mapping to 'selectedIds'.`);
-                 return { ...parsed, selectedIds: val.map(String) }; // Ensure they are strings
+                 return { ...parsed, selectedIds: val.map(String) };
              }
         }
     }
-    
-    // Return original if we couldn't fix it, let frontend/validation handle the error
     return parsed;
 };
 
 // --- Routes ---
 
-// 1. Health Check - Critical for Railway
 app.get('/', (req, res) => {
   res.status(200).send('ChefNote API Server is running.');
 });
 
-// 2. Get All Recipes
 app.get('/api/recipes', (req, res) => {
   try {
     const recipes = db.get('recipes').value();
@@ -178,7 +148,6 @@ app.get('/api/recipes', (req, res) => {
   }
 });
 
-// 3. Create Recipe
 app.post('/api/recipes', (req, res) => {
   try {
     const newRecipe = req.body;
@@ -194,7 +163,6 @@ app.post('/api/recipes', (req, res) => {
   }
 });
 
-// 4. Update Recipe
 app.put('/api/recipes/:id', (req, res) => {
   try {
     const { id } = req.params;
@@ -213,7 +181,6 @@ app.put('/api/recipes/:id', (req, res) => {
   }
 });
 
-// 5. Get Categories
 app.get('/api/categories', (req, res) => {
   try {
     const categories = db.get('categories').value();
@@ -223,7 +190,6 @@ app.get('/api/categories', (req, res) => {
   }
 });
 
-// 6. Update Categories
 app.put('/api/categories', (req, res) => {
   try {
     const newCategories = req.body;
@@ -238,7 +204,6 @@ app.put('/api/categories', (req, res) => {
   }
 });
 
-// 7. Get Settings
 app.get('/api/settings', (req, res) => {
   try {
     const settings = db.get('settings').value() || { aiModel: 'gemini-3-flash-preview', imageModel: 'doubao-seedream-4-5-251128' };
@@ -248,14 +213,11 @@ app.get('/api/settings', (req, res) => {
   }
 });
 
-// 8. Update Settings
 app.put('/api/settings', (req, res) => {
   try {
     const updates = req.body;
-    // Merge updates with existing settings (or defaults)
     const current = db.get('settings').value() || { aiModel: 'gemini-3-flash-preview', imageModel: 'doubao-seedream-4-5-251128' };
     const newSettings = { ...current, ...updates };
-    
     db.set('settings', newSettings).write();
     res.json(newSettings);
   } catch (error) {
@@ -267,7 +229,6 @@ app.put('/api/settings', (req, res) => {
 
 app.post('/api/ai/recommend-menu', async (req, res) => {
   const modelName = getTextModel();
-  console.log(`AI Request: Recommend Menu (Model: ${modelName})`);
   const { recipes, peopleCount } = req.body;
   
   if (!recipes || !peopleCount) {
@@ -275,7 +236,6 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
        return;
   }
 
-  // Get current season
   const month = new Date().getMonth() + 1;
   let season = 'Winter';
   if (month >= 3 && month <= 5) season = 'Spring';
@@ -297,20 +257,13 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
       ${JSON.stringify(recipes.map((r: any) => ({ id: r.id, title: r.title, category: r.category, ingredients: r.ingredients })))}
 
       Return JSON format: { "selectedIds": ["id1", "id2", ...] }
-      IMPORTANT: Return ONLY valid JSON. Do NOT use Markdown code blocks.
+      IMPORTANT: Return ONLY valid JSON.
   `;
 
   try {
       if (modelName.startsWith('doubao')) {
           if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
-          
-          // Use Endpoint ID if available, otherwise fallback to model name (which will likely 404)
           const targetModel = ARK_ENDPOINT_ID || modelName;
-          
-          if (!ARK_ENDPOINT_ID) {
-              console.warn('WARNING: ARK_ENDPOINT_ID is not set. Ark API requires an Endpoint ID (ep-xxxx), not a model name. Request will likely fail with 404.');
-          }
-
           const arkRes = await fetch(ARK_CHAT_URL, {
               method: 'POST',
               headers: {
@@ -320,380 +273,213 @@ app.post('/api/ai/recommend-menu', async (req, res) => {
               body: JSON.stringify({
                   model: targetModel, 
                   messages: [{ role: 'user', content: prompt }],
-                  // Note: Some Doubao endpoints might ignore this or still return markdown
                   response_format: { type: 'json_object' } 
               })
           });
-          
-          if (!arkRes.ok) {
-              const errText = await arkRes.text();
-              console.error('Ark API Error Body:', errText);
-              throw new Error(`Ark API Error: ${arkRes.status} ${arkRes.statusText} - ${errText}`);
-          }
+          if (!arkRes.ok) throw new Error(`Ark API Error: ${arkRes.status}`);
           const data = await arkRes.json();
           const content = data.choices[0].message.content;
-          console.log("Doubao Raw Response:", content);
-          
-          // Use robust parser & normalize
           let parsed = safeJsonParse(content);
           parsed = normalizeMenuResponse(parsed);
-          
           res.json(parsed);
-
       } else {
-          // Gemini
-          if (!ai) { return res.status(503).json({ error: 'Gemini API Key not configured' }); }
-          
+          if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
           const response = await ai.models.generateContent({
-              model: modelName, 
+              model: modelName,
               contents: prompt,
-              config: { 
-                  responseMimeType: "application/json",
-                  responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        selectedIds: { 
-                          type: Type.ARRAY, 
-                          items: { type: Type.STRING },
-                          description: "Array of recipe IDs to add to cart"
-                        },
-                        reasoning: { type: Type.STRING, description: "Short explanation in Chinese why this menu was chosen." }
-                    },
-                    required: ["selectedIds"]
-                  }
-              }
+              config: { responseMimeType: 'application/json' }
           });
-          
-          // Use robust parser & normalize
-          let parsed = safeJsonParse(response.text || '{}');
-          parsed = normalizeMenuResponse(parsed);
-          
-          res.json(parsed);
+          const parsed = safeJsonParse(response.text || '{}');
+          res.json(normalizeMenuResponse(parsed));
       }
   } catch (error: any) {
-      console.error('AI Recommend Menu Error:', error);
-      // Return the error message to frontend for debugging
-      res.status(500).json({ error: error.message || 'Failed to recommend menu' });
+      console.error('Recommendation Error:', error);
+      res.status(500).json({ error: error.message });
   }
 });
 
 app.post('/api/ai/generate-menu', async (req, res) => {
-    const modelName = getTextModel();
-    console.log(`AI Request: Generate Menu Theme (Model: ${modelName})`);
-    const { recipes, selectedIds } = req.body;
-    if (!recipes || !selectedIds) {
-            res.status(400).json({ error: 'Missing recipes or selectedIds' });
-            return;
-    }
+  const modelName = getTextModel();
+  const { recipes, selectedIds } = req.body;
+  const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
 
-    const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
-    const selectedNames = selectedRecipes.map((r: any) => r.title).join(", ");
-    const date = new Date().toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const prompt = `
+      Create a poetic menu theme for these dishes: ${selectedRecipes.map((r: any) => r.title).join(', ')}.
+      
+      Required Fields:
+      - title: A poetic 4-character Chinese name for the meal (e.g. 荷塘月色, 春意盎然).
+      - description: A short, elegant description in Chinese (approx 15 words).
+      - idiom: A 3-character artistic phrase or idiom that captures the soul of the meal (e.g. 寻味集, 慢生活, 悦己食).
+      - themeColor: Choose one of these based on the food character:
+          - "red": For spicy, hot, festive, or bold meat dishes.
+          - "green": For healthy, light, vegetable-heavy, or refreshing spring dishes.
+          - "blue": For seafood, cold dishes, or modern fusion.
+          - "neutral": For classic, earthy, stewed, or homey comfort food.
+      
+      Rules:
+      1. If most dishes are spicy, use "red".
+      2. If most are veggies or light, use "green".
+      3. If they are traditional stews or warm home food, use "neutral".
+      4. DO NOT ALWAYS USE THE SAME COLOR. BE CREATIVE.
+      
+      Return JSON format: { "title": "...", "description": "...", "idiom": "...", "themeColor": "..." }
+      IMPORTANT: Return ONLY valid JSON.
+  `;
 
-    const prompt = `
-        Today is ${date}. 
-        I have selected these dishes for a meal: ${selectedNames}.
-        Please generate a sophisticated, high-end Chinese banquet menu theme.
-
-        Requirements for 'description':
-        - Do NOT describe the dishes or ingredients.
-        - It MUST be a poetic, seasonal, or atmospheric sentence reflecting the mood (e.g., "The autumn breeze is refreshing," "A joyful gathering for the New Year," "Simple flavors of home").
-        - Keep it elegant and brief (under 20 words).
-        
-        Return a JSON object. Do NOT use Markdown code blocks.
-    `;
-
-    try {
-        if (modelName.startsWith('doubao')) {
-             if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
-
-             // Use Endpoint ID if available, otherwise fallback to model name
-             const targetModel = ARK_ENDPOINT_ID || modelName;
-
-             if (!ARK_ENDPOINT_ID) {
-                console.warn('WARNING: ARK_ENDPOINT_ID is not set. Ark API requires an Endpoint ID (ep-xxxx), not a model name. Request will likely fail with 404.');
-             }
-
-             const arkRes = await fetch(ARK_CHAT_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${ARK_API_KEY}`
-                },
-                body: JSON.stringify({
-                    model: targetModel,
-                    messages: [{ role: 'user', content: prompt }],
-                    response_format: { type: 'json_object' }
-                })
-            });
-            if (!arkRes.ok) {
-                const errText = await arkRes.text();
-                console.error('Ark API Error Body:', errText);
-                throw new Error(`Ark API Error: ${arkRes.status} ${arkRes.statusText} - ${errText}`);
-            }
-            const data = await arkRes.json();
-            const content = data.choices[0].message.content;
-            console.log("Doubao Raw Response (Theme):", content);
-            
-            // Use robust parser
-            res.json(safeJsonParse(content));
-
-        } else {
-             if (!ai) { return res.status(503).json({ error: 'Gemini API Key not configured' }); }
-
-             const response = await ai.models.generateContent({
-                model: modelName, 
-                contents: prompt,
-                config: { 
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        title: { type: Type.STRING, description: "Theme title (e.g. 'Autumn Feast')" },
-                        description: { type: Type.STRING, description: "Seasonal or atmospheric text, NOT dish summary." },
-                        idiom: { type: Type.STRING, description: "A 4-character Chinese idiom" },
-                        themeColor: { type: Type.STRING, enum: ["red", "green", "blue", "neutral"] }
-                    },
-                    required: ["title", "description", "idiom", "themeColor"]
-                    }
-                }
-            });
-            // Use robust parser
-            res.json(safeJsonParse(response.text || '{}'));
-        }
-    } catch (error: any) {
-        console.error('AI Generate Menu Error:', error);
-        const errorMessage = error.message || 'Failed to generate menu';
-        res.status(500).json({ error: errorMessage });
-    }
+  try {
+      if (modelName.startsWith('doubao')) {
+          if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
+          const targetModel = ARK_ENDPOINT_ID || modelName;
+          const arkRes = await fetch(ARK_CHAT_URL, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${ARK_API_KEY}`
+              },
+              body: JSON.stringify({
+                  model: targetModel, 
+                  messages: [{ role: 'user', content: prompt }],
+                  response_format: { type: 'json_object' } 
+              })
+          });
+          if (!arkRes.ok) throw new Error(`Ark API Error: ${arkRes.status}`);
+          const data = await arkRes.json();
+          const content = data.choices[0].message.content;
+          res.json(safeJsonParse(content));
+      } else {
+          if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
+          const response = await ai.models.generateContent({
+              model: modelName,
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+          });
+          res.json(safeJsonParse(response.text || '{}'));
+      }
+  } catch (error: any) {
+      console.error('Menu Generation Error:', error);
+      res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/ai/generate-prep', async (req, res) => {
     const modelName = getTextModel();
-    console.log(`AI Request: Generate Prep List (Model: ${modelName})`);
     const { recipes, selectedIds } = req.body;
-    if (!recipes || !selectedIds) {
-            res.status(400).json({ error: 'Missing recipes or selectedIds' });
-            return;
-    }
     const selectedRecipes = recipes.filter((r: any) => selectedIds.includes(r.id));
-    const ingredientsData = selectedRecipes.map((r: any) => 
-        `${r.title}: ${r.ingredients.map((i: any) => `${i.name} (${i.amount})`).join(', ')}`
-    ).join('\n');
-    
+
     const prompt = `
-        Based on these dishes: ${ingredientsData}
-        Generate a consolidated shopping/prep list.
-        Just return the text content.
+        Based on these recipes, generate a categorized prep list for a home cook.
+        Combine similar ingredients.
+        
+        Recipes:
+        ${JSON.stringify(selectedRecipes.map((r: any) => ({ title: r.title, ingredients: r.ingredients })))}
+
+        Return a concise markdown list of ingredients to buy/prepare.
     `;
 
     try {
         if (modelName.startsWith('doubao')) {
-             if (!ARK_API_KEY) { return res.status(503).json({ error: 'Ark API Key not configured' }); }
-             
-             // Use Endpoint ID if available, otherwise fallback to model name
-             const targetModel = ARK_ENDPOINT_ID || modelName;
-
-             if (!ARK_ENDPOINT_ID) {
-                console.warn('WARNING: ARK_ENDPOINT_ID is not set. Ark API requires an Endpoint ID (ep-xxxx), not a model name. Request will likely fail with 404.');
-             }
-
-             const arkRes = await fetch(ARK_CHAT_URL, {
+            const targetModel = ARK_ENDPOINT_ID || modelName;
+            const arkRes = await fetch(ARK_CHAT_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${ARK_API_KEY}`
-                },
-                body: JSON.stringify({
-                    model: targetModel,
-                    messages: [{ role: 'user', content: prompt }]
-                })
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
+                body: JSON.stringify({ model: targetModel, messages: [{ role: 'user', content: prompt }] })
             });
-            if (!arkRes.ok) {
-                const errText = await arkRes.text();
-                console.error('Ark API Error Body:', errText);
-                throw new Error(`Ark API Error: ${arkRes.status} ${arkRes.statusText} - ${errText}`);
-            }
             const data = await arkRes.json();
-            const content = data.choices[0].message.content;
-            res.json({ text: content });
-
+            res.json({ text: data.choices[0].message.content });
         } else {
-             if (!ai) { return res.status(503).json({ error: 'Gemini API Key not configured' }); }
-             
-             const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-            });
+            if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
+            const response = await ai.models.generateContent({ model: modelName, contents: prompt });
             res.json({ text: response.text });
         }
     } catch (error: any) {
-        console.error('AI Generate Prep Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to generate prep list' });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/ai/generate-image', async (req, res) => {
+    const modelName = getImageModel();
+    const { prompt } = req.body;
+    console.log(`Image Generation: ${prompt} (Model: ${modelName})`);
+
+    try {
+        if (modelName.startsWith('doubao')) {
+            const arkRes = await fetch(ARK_IMAGE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
+                body: JSON.stringify({
+                    model: modelName,
+                    prompt: prompt,
+                    size: '768x1024' // 3:4 for vertical covers
+                })
+            });
+            if (!arkRes.ok) throw new Error(`Doubao Image Error: ${arkRes.status}`);
+            const data = await arkRes.json();
+            const base64 = data.data[0].b64_json;
+            res.json({ image: `data:image/png;base64,${base64}` });
+        } else {
+            if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: prompt,
+                config: { imageConfig: { aspectRatio: "3:4" } },
+            });
+            let base64 = "";
+            for (const part of response.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    base64 = part.inlineData.data;
+                    break;
+                }
+            }
+            if (!base64) throw new Error("No image data returned from Gemini");
+            res.json({ image: `data:image/png;base64,${base64}` });
+        }
+    } catch (error: any) {
+        console.error('Image Gen Error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
 app.post('/api/ai/optimize-image', async (req, res) => {
-  if (!ai) {
-      res.status(503).json({ error: 'Server API Key not configured' });
-      return;
-  }
-  try {
-      console.log('AI Request: Optimize Image (Model: gemini-2.5-flash-image)');
-      const { image } = req.body; // Base64 string
-      if (!image) {
-           res.status(400).json({ error: 'Missing image data' });
-           return;
-      }
-
-      // Robust base64 parsing
-      let base64Data = image;
-      let mimeType = 'image/jpeg'; // Default
-
-      if (image.includes(',')) {
-          const parts = image.split(',');
-          base64Data = parts[1];
-          const match = parts[0].match(/:(.*?);/);
-          if (match) {
-              mimeType = match[1];
-          }
-      }
-
-      console.log(`Optimizing image type: ${mimeType}, length: ${base64Data.length}`);
-
-      // Optimized prompt for "Food Filter" effect
-      const prompt = "Act as a professional food photographer's retoucher. Apply a 'Delicious' filter to this image. Enhance the warm tones, increase contrast and saturation slightly to make the food look fresh and appetizing. Fix lighting to be soft and studio-like. Maintain the original composition and content exactly, just improve the aesthetics.";
-
-      const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image', // Fixed model for image editing
-          contents: {
-            parts: [
-              {
-                inlineData: {
-                  data: base64Data,
-                  mimeType: mimeType,
-                },
-              },
-              {
-                text: prompt,
-              },
-            ],
-          },
-      });
-      
-      let newImageBase64 = '';
-      if (response.candidates?.[0]?.content?.parts) {
-          for (const part of response.candidates[0].content.parts) {
-              if (part.inlineData && part.inlineData.data) {
-                  newImageBase64 = part.inlineData.data;
-                  break;
-              }
-          }
-      }
-
-      if (newImageBase64) {
-          res.json({ image: `data:image/png;base64,${newImageBase64}` });
-      } else {
-          // If no image part, check for text (refusal or error explanation)
-          let refusalText = '';
-          if (response.candidates?.[0]?.content?.parts) {
-              for (const part of response.candidates[0].content.parts) {
-                  if (part.text) refusalText += part.text;
-              }
-          }
-          console.warn("AI returned no image. Text:", refusalText);
-          throw new Error(refusalText || "AI Model returned no image (Safety filter or unknown error)");
-      }
-
-  } catch (error: any) {
-      console.error('AI Optimize Image Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to optimize image' });
-  }
-});
-
-// --- Doubao (Ark) Image Generation ---
-app.post('/api/ai/generate-image', async (req, res) => {
-    if (!ARK_API_KEY) {
-        res.status(503).json({ error: 'Ark API Key not configured' });
-        return;
-    }
-    
-    const imageModel = getImageModel();
-    console.log(`Ark Request: Generate Image (Model: ${imageModel})`);
-    const { prompt } = req.body;
-
-    if (!prompt) {
-        res.status(400).json({ error: 'Missing prompt' });
-        return;
-    }
+    const { image } = req.body;
+    const modelName = getImageModel();
+    console.log(`Image Optimization (Filter) requested. Model choice: ${modelName}`);
 
     try {
-        const response = await fetch(ARK_IMAGE_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${ARK_API_KEY}`
+        // Doubao Seedream is T2I (Text-to-Image), not standard Img2Img.
+        // For 'Filter' style optimization (preserving structure), we always fallback to Gemini.
+        if (!ai) { return res.status(503).json({ error: 'Gemini API Key not set' }); }
+        
+        const base64Data = image.split(',')[1] || image;
+        const mimeType = image.split(';')[0].split(':')[1] || 'image/jpeg';
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [
+                    { inlineData: { data: base64Data, mimeType: mimeType } },
+                    { text: 'Enhance this food photo to look professional, appetizing, and high-end. Adjust lighting, contrast, and color vibrancy while keeping the original dish structure perfectly intact. Return the modified image.' },
+                ],
             },
-            body: JSON.stringify({
-                model: imageModel, // doubao-seedream-4-5-251128
-                prompt: prompt,
-                sequential_image_generation: "disabled",
-                response_format: "url", // We fetch this URL backend-side
-                size: "2K",
-                stream: false,
-                watermark: true
-            })
         });
 
-        if (!response.ok) {
-            const err = await response.text();
-            console.error('Ark Generate Image Error:', err);
-            throw new Error(`Ark API Error: ${response.status} ${response.statusText}`);
+        let resultBase64 = "";
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                resultBase64 = part.inlineData.data;
+                break;
+            }
         }
-
-        const data = await response.json();
-        // Ark Image response structure: { data: [{ url: "..." }] }
-        const imageUrl = data.data?.[0]?.url;
-
-        if (!imageUrl) {
-            throw new Error("No image URL returned from Ark");
-        }
-
-        console.log("Image URL received, fetching content...");
-
-        // Fetch the image content to convert to base64
-        const imageRes = await fetch(imageUrl);
-        const arrayBuffer = await imageRes.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        const mimeType = imageRes.headers.get('content-type') || 'image/png';
-
-        res.json({ image: `data:${mimeType};base64,${base64}` });
+        if (!resultBase64) throw new Error("Optimization failed - no image returned");
+        res.json({ image: `data:image/png;base64,${resultBase64}` });
 
     } catch (error: any) {
-        console.error('Ark Generate Image Error:', error);
-        res.status(500).json({ error: error.message || 'Failed to generate image' });
+        console.error('Image Optimization Error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// Start Server with Graceful Shutdown
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check available at http://0.0.0.0:${PORT}/`);
-});
-
-// Handle SIGTERM (Railway/Docker stop signal)
-(process as any).on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    (process as any).exit(0);
-  });
-});
-
-(process as any).on('SIGINT', () => {
-  console.log('SIGINT signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    (process as any).exit(0);
-  });
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`ChefNote Backend running on port ${PORT}`);
+  console.log(`API Base URL: http://0.0.0.0:${PORT}/api`);
 });

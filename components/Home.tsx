@@ -24,6 +24,56 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   // Calculate stats
   const masterScore = recipes.reduce((acc, r) => acc + (r.logs ? r.logs.length : 0), 0);
 
+  // Split recipes into two columns for a robust masonry layout on mobile
+  const leftColRecipes = filteredRecipes.filter((_, idx) => idx % 2 === 0);
+  const rightColRecipes = filteredRecipes.filter((_, idx) => idx % 2 !== 0);
+
+  const renderRecipeCard = (recipe: Recipe) => (
+    <div 
+      key={recipe.id} 
+      onClick={() => onRecipeClick(recipe)}
+      className="bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4"
+      style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
+    >
+      {/* Touch Feedback Overlay */}
+      <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
+
+      <div className="relative">
+        <img 
+          src={recipe.coverImage} 
+          alt={recipe.title} 
+          className="w-full object-cover bg-gray-50 block"
+          style={{ aspectRatio: '3/4' }} 
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        
+        {/* Proficiency Badge */}
+        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center">
+           <span className="text-[10px] text-[#385c44] font-bold tracking-wide leading-none pt-[1px]">
+             {PROFICIENCY_TEXT[recipe.proficiency]}
+           </span>
+        </div>
+
+        {/* Cooking Count Overlay */}
+        {recipe.logs && recipe.logs.length > 0 && (
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10">
+                <Flame size={10} fill="currentColor" className="text-orange-400" />
+                {recipe.logs.length}
+            </div>
+        )}
+      </div>
+      
+      <div className="p-4">
+        <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+            {recipe.category}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full bg-[#f2f4f6]">
       {/* Header Area */}
@@ -40,7 +90,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
              </button>
         </div>
 
-        {/* Search Bar & Order Button Row (Resized & Compact) */}
+        {/* Search Bar & Order Button Row */}
         <div className="flex gap-3 mb-5 items-center">
           <div className="flex-1 relative shadow-sm rounded-full group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-[#385c44] transition-colors" />
@@ -60,7 +110,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
           </button>
         </div>
 
-        {/* Title Section (Spacing Reduced) */}
+        {/* Title Section */}
         <div className="mb-6 px-1">
             <h2 className="text-[28px] font-bold text-[#1f1f1f] leading-tight mb-1.5 tracking-tight">我的厨房日记</h2>
             <p className="text-[13px] text-gray-400 font-normal tracking-wide">
@@ -96,55 +146,16 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
         </div>
       </div>
 
-      {/* Masonry Grid */}
+      {/* Masonry Grid with 2-Column Flexbox for maximum stability */}
       <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
         {filteredRecipes.length > 0 ? (
-          <div className="columns-2 gap-4 space-y-4">
-            {filteredRecipes.map(recipe => (
-              <div 
-                key={recipe.id} 
-                onClick={() => onRecipeClick(recipe)}
-                className="break-inside-avoid bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative"
-                style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
-              >
-                {/* Touch Feedback Overlay (Replaces active:scale to prevent layout flicker) */}
-                <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
-
-                <div className="relative">
-                  <img 
-                    src={recipe.coverImage} 
-                    alt={recipe.title} 
-                    className="w-full object-cover bg-gray-50"
-                    style={{ aspectRatio: '3/4' }} 
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                  
-                  {/* Proficiency Badge - Fixed for Mobile alignment */}
-                  <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center">
-                     <span className="text-[10px] text-[#385c44] font-bold tracking-wide leading-none pt-[1px]">
-                       {PROFICIENCY_TEXT[recipe.proficiency]}
-                     </span>
-                  </div>
-
-                  {/* Cooking Count Overlay */}
-                  {recipe.logs && recipe.logs.length > 0 && (
-                      <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10">
-                          <Flame size={10} fill="currentColor" className="text-orange-400" />
-                          {recipe.logs.length}
-                      </div>
-                  )}
-                </div>
-                
-                <div className="p-4">
-                  <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
-                      {recipe.category}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex gap-4">
+            <div className="flex-1">
+              {leftColRecipes.map(renderRecipeCard)}
+            </div>
+            <div className="flex-1">
+              {rightColRecipes.map(renderRecipeCard)}
+            </div>
           </div>
         ) : (
           /* Empty State */
