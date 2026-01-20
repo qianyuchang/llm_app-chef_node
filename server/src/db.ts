@@ -19,7 +19,8 @@ interface Recipe {
 }
 
 interface Settings {
-  aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025';
+  aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025' | 'doubao-1-5-pro-32k-250115';
+  imageModel?: 'doubao-seedream-4-5-251128';
 }
 
 interface DatabaseSchema {
@@ -31,7 +32,8 @@ interface DatabaseSchema {
 // Initial Data
 const INITIAL_CATEGORIES = ['炒菜', '炖菜', '清蒸', '甜品', '凉菜', '汤羹', '其他'];
 const INITIAL_SETTINGS: Settings = {
-  aiModel: 'gemini-3-flash-preview'
+  aiModel: 'gemini-3-flash-preview',
+  imageModel: 'doubao-seedream-4-5-251128'
 };
 
 const MOCK_RECIPES: Recipe[] = [

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2, Sparkles, Play, Film } from 'lucide-react';
+import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import { Recipe, CookingLog } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
@@ -45,10 +45,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
   const [processingLogId, setProcessingLogId] = useState<string | null>(null); // For individual log deletion/cover set
-
-  // Video Generation State
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -128,21 +124,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       }
   };
 
-  const handleAnimateImage = async () => {
-      if (!recipe.coverImage) return;
-      setIsAnimating(true);
-      try {
-          const videoUrl = await api.animateImage(recipe.coverImage);
-          setGeneratedVideo(videoUrl);
-          onShowToast("视频生成成功！", 'success');
-      } catch (e: any) {
-          console.error(e);
-          onShowToast(`生成失败: ${e.message}`, 'error');
-      } finally {
-          setIsAnimating(false);
-      }
-  };
-
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden" {...swipeHandlers}>
       {/* Sticky Header */}
@@ -162,54 +143,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24">
-        {/* Cover Image / Video Area */}
+        {/* Cover Image */}
         <div className="relative h-96 w-full group bg-black">
-            {generatedVideo ? (
-                <div className="relative w-full h-full">
-                    <video 
-                        src={generatedVideo} 
-                        className="w-full h-full object-cover" 
-                        controls 
-                        autoPlay 
-                        loop
-                        playsInline
-                    />
-                    <button 
-                        onClick={() => setGeneratedVideo(null)}
-                        className="absolute top-20 right-4 p-2 bg-black/50 text-white rounded-full pointer-events-auto backdrop-blur-md"
-                    >
-                        <ImageIcon size={16} />
-                    </button>
-                </div>
-            ) : (
-                <>
-                    <img 
-                        src={recipe.coverImage} 
-                        alt={recipe.title} 
-                        className="w-full h-full object-cover opacity-95"
-                    />
-                    {/* Animate Button */}
-                    <div className="absolute bottom-4 right-4 pointer-events-auto z-20">
-                         <button 
-                             onClick={handleAnimateImage}
-                             disabled={isAnimating}
-                             className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md border border-white/30 rounded-full text-white font-bold text-xs shadow-lg hover:bg-white/30 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-wait"
-                         >
-                             {isAnimating ? (
-                                 <>
-                                    <Loader2 size={14} className="animate-spin" />
-                                    <span>AI生成中...</span>
-                                 </>
-                             ) : (
-                                 <>
-                                    <Film size={14} />
-                                    <span>让菜动起来</span>
-                                 </>
-                             )}
-                         </button>
-                    </div>
-                </>
-            )}
+            <img 
+                src={recipe.coverImage} 
+                alt={recipe.title} 
+                className="w-full h-full object-cover opacity-95"
+            />
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
         </div>
 

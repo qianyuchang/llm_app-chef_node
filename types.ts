@@ -31,7 +31,8 @@ export interface CartItem {
 }
 
 export interface Settings {
-  aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025';
+  aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025' | 'doubao-1-5-pro-32k-250115';
+  imageModel?: 'doubao-seedream-4-5-251128';
 }
 
 export type ViewState = 'HOME' | 'ADD_RECIPE' | 'ORDER_MODE' | 'CATEGORY_MANAGER' | 'RECIPE_DETAIL' | 'SETTINGS';

@@ -31,6 +31,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
   
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -65,6 +66,25 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
     setCoverImage(croppedImage);
     setIsCropping(false);
     setTempImage(null);
+  };
+
+  const handleGenerateCover = async () => {
+      if (!title.trim()) {
+          onShowToast("请先输入菜名", 'error');
+          return;
+      }
+      setIsGeneratingImage(true);
+      try {
+          const prompt = `Professional food photography of ${title}, ${category} dish, high resolution, 4k, delicious, appetizing, cinematic lighting, photorealistic.`;
+          const image = await api.generateImage(prompt);
+          setCoverImage(image);
+          onShowToast("封面生成成功", 'success');
+      } catch (error: any) {
+          console.error(error);
+          onShowToast(`生成失败: ${error.message}`, 'error');
+      } finally {
+          setIsGeneratingImage(false);
+      }
   };
 
   const addIngredient = () => setIngredients([...ingredients, {name: '', amount: ''}]);
@@ -156,8 +176,8 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
 
       <div className="flex-1 overflow-y-auto px-4 pt-6 space-y-6">
         {/* Image Upload */}
-        <div className="flex flex-col items-center justify-center mb-4">
-          <label className="relative w-32 h-32 rounded-[2rem] bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#1a472a]/50 transition-colors group shadow-sm">
+        <div className="flex flex-col items-center justify-center mb-4 relative">
+          <label className={`relative w-32 h-32 rounded-[2rem] bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#1a472a]/50 transition-colors group shadow-sm ${isGeneratingImage ? 'opacity-50 pointer-events-none' : ''}`}>
              {coverImage ? (
                  <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
              ) : (
@@ -166,15 +186,33 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
                  </>
              )}
+             {isGeneratingImage && (
+                 <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                     <Loader2 className="animate-spin text-[#1a472a]" />
+                 </div>
+             )}
           </label>
-           {/* If image exists, allow changing it */}
-           {coverImage && (
-             <label className="text-xs text-[#1a472a] mt-3 font-medium cursor-pointer">
-                更换封面
-                <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
-             </label>
-           )}
-           {!coverImage && <span className="text-xs text-[#1a472a] mt-3 font-medium">上传封面</span>}
+           
+           <div className="flex gap-4 mt-3">
+               {/* Upload Button Label */}
+               <label className="text-xs text-gray-500 font-medium cursor-pointer flex items-center gap-1 hover:text-gray-800 transition-colors">
+                  <Camera size={14} />
+                  {coverImage ? '更换照片' : '上传照片'}
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
+               </label>
+               
+               <div className="w-[1px] h-4 bg-gray-300"></div>
+
+               {/* AI Generate Button */}
+               <button 
+                  onClick={handleGenerateCover}
+                  disabled={isGeneratingImage || !title}
+                  className="text-xs text-[#1a472a] font-bold flex items-center gap-1 hover:text-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                  <Sparkles size={14} />
+                  AI 生成封面
+               </button>
+           </div>
         </div>
 
         {/* Basic Info */}
