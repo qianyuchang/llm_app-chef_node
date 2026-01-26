@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import db from './db';
@@ -45,31 +44,39 @@ app.use(express.json({ limit: '50mb' }) as any);
 // --- R2 Upload Helper ---
 const uploadToR2 = async (base64Data: string): Promise<string> => {
   try {
-    const base64 = base64Data.split(',')[1] || base64Data;
+    // Standardize base64 data extraction
+    const base64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
     const buffer = Buffer.from(base64, 'base64');
+    
+    // Generate unique file name
     const fileName = `chefnote-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     
-    // Cloudflare R2 API PUT request
+    // Cloudflare R2 Management API PUT request
     const r2Url = `https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects/${fileName}`;
     
+    console.log(`[R2] Attempting upload: ${fileName} (${buffer.length} bytes)`);
+
     const response = await fetch(r2Url, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${R2_TOKEN}`,
-        'Content-Type': 'image/jpeg'
+        'Content-Type': 'image/jpeg',
       },
-      body: buffer
+      // Using Uint8Array is safer for cross-environment fetch implementations
+      body: new Uint8Array(buffer)
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("R2 API Error:", errorText);
-      throw new Error(`Cloudflare R2 Upload Failed: ${response.statusText}`);
+      console.error(`[R2] Upload Failed. Status: ${response.status}. Body: ${errorText}`);
+      throw new Error(`Cloudflare R2 API error: ${response.status} ${errorText}`);
     }
 
-    return `https://${R2_CDN_DOMAIN}/${fileName}`;
+    const finalUrl = `https://${R2_CDN_DOMAIN}/${fileName}`;
+    console.log(`[R2] Upload Successful: ${finalUrl}`);
+    return finalUrl;
   } catch (err) {
-    console.error("R2 Upload Error:", err);
+    console.error("[R2] Fatal Upload Error:", err);
     throw err;
   }
 };

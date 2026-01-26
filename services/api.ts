@@ -110,18 +110,24 @@ export const api = {
   },
 
   uploadImage: async (base64Image: string): Promise<string> => {
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image: base64Image }),
-    });
-    if (!response.ok) {
-        throw new Error('Failed to upload image to R2');
+    try {
+        const response = await fetch(`${API_BASE_URL}/upload`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: base64Image }),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to upload image to R2');
+        }
+        const data = await response.json();
+        return data.url;
+    } catch (err: any) {
+        console.error("R2 Upload Client Error:", err);
+        throw err;
     }
-    const data = await response.json();
-    return data.url;
   },
 
   optimizeImage: async (base64Image: string): Promise<string> => {
@@ -133,7 +139,7 @@ export const api = {
         body: JSON.stringify({ image: base64Image }),
       });
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to optimize image');
       }
       const data = await response.json();
@@ -149,7 +155,7 @@ export const api = {
           body: JSON.stringify({ prompt }),
       });
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to generate image');
       }
       const data = await response.json();
@@ -171,7 +177,7 @@ export const api = {
       });
       
       if (!response.ok) {
-          const err = await response.json();
+          const err = await response.json().catch(() => ({}));
           throw new Error(err.error || 'Search failed');
       }
       const data = await response.json();

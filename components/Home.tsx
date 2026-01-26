@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, UtensilsCrossed, Flame, Sparkles, Settings, Loader2, X } from 'lucide-react';
 import { Recipe } from '../types';
@@ -236,7 +237,8 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
           {allCategories.map(cat => (
             <button
               key={cat}
-              ref={el => categoryRefs.current[cat] = el}
+              // Fixed: Wrap the ref assignment in curly braces to avoid implicit return of HTMLButtonElement, which TypeScript/React 18+ expects to be void or a cleanup function.
+              ref={el => { categoryRefs.current[cat] = el; }}
               onClick={() => setActiveCategory(cat)}
               className={`px-5 py-2 rounded-full whitespace-nowrap text-[13px] font-bold transition-all duration-300 ${
                 activeCategory === cat ? 'bg-[#385c44] text-white shadow-lg' : 'bg-white text-gray-600 shadow-sm'
