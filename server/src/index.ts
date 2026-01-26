@@ -19,10 +19,10 @@ import { Buffer } from 'buffer';
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
-// Cloudflare R2 Config
+// Cloudflare R2 Config (Updated with new credentials)
 const R2_ACCOUNT_ID = '12816f3e935015a228c34426bf75125f';
 const R2_BUCKET = 'chefnote';
-const R2_TOKEN = '4EuRWRWwkGi7KvbB2Jy22cwh_XTb99U4pScWiiJe';
+const R2_TOKEN = 'L45c4TlBge6JCoQZB8TFAy_Gnptfo82uDQ-_4BeD'; // New Token
 const R2_CDN_DOMAIN = 'cdn.yufish.tech';
 
 // Initialize Gemini Client
@@ -52,8 +52,8 @@ const uploadToR2 = async (base64Data: string): Promise<string> => {
     // Generate unique file name
     const fileName = `recipe-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     
-    // Using the Cloudflare API endpoint for R2 object upload
-    // Ensure the token has "R2 Storage: Edit" permission for the account/bucket
+    // Using the Cloudflare Management API endpoint for R2 object upload
+    // Endpoint: https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket_name}/objects/{key}
     const r2Url = `https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects/${fileName}`;
     
     console.log(`[R2] Attempting upload to: ${R2_BUCKET}/${fileName} (${buffer.length} bytes)`);
@@ -72,8 +72,7 @@ const uploadToR2 = async (base64Data: string): Promise<string> => {
       const errorText = await response.text();
       console.error(`[R2] Upload Failed. Status: ${response.status} ${response.statusText}. Body: ${errorText}`);
       
-      // If we get an auth error, it's usually token scopes. 
-      // Cloudflare error 10000 = Authentication error.
+      // Error 10000 often means the token is invalid or lacks the "R2:Edit" permission
       throw new Error(`R2 API Error: ${response.status} - ${errorText}`);
     }
 
