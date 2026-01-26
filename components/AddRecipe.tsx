@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Camera, Link as LinkIcon, Plus, Trash2, ChevronRight, Check, ChefHat, Sparkles, Loader2 } from 'lucide-react';
+import { ChevronLeft, Camera, Link as LinkIcon, Plus, Trash2, ChevronRight, Check, ChefHat, Sparkles, Loader2, ClipboardPaste, X } from 'lucide-react';
 import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
@@ -28,6 +28,10 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
   // Cropper State
   const [tempImage, setTempImage] = useState<string | null>(null);
   const [isCropping, setIsCropping] = useState(false);
+  
+  // Smart Import State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
   
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
@@ -101,6 +105,65 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
     setSteps(newSteps);
   };
 
+  // --- Smart Import Logic ---
+  const handleSmartImport = () => {
+      if (!importText.trim()) {
+          setShowImportModal(false);
+          return;
+      }
+
+      const lines = importText.split('\n');
+      const newIngredients: {name: string, amount: string}[] = [];
+
+      lines.forEach(line => {
+          let cleanLine = line.trim();
+          // Remove list bullets if present (e.g., "1. ", "- ", "• ")
+          cleanLine = cleanLine.replace(/^[\d]+\.|^[-•*]\s*/, '').trim();
+          
+          if (!cleanLine) return;
+
+          // Strategy: Split by space or comma
+          // Heuristic: If starts with number, first part is amount. Else, last part is amount.
+          const parts = cleanLine.split(/[\s,，]+/);
+          
+          if (parts.length === 1) {
+              newIngredients.push({ name: parts[0], amount: '' });
+          } else {
+              // Check if first part looks like a number/amount
+              const firstPartIsAmount = /^[\d\.\/]+/.test(parts[0]);
+              
+              if (firstPartIsAmount) {
+                  newIngredients.push({
+                      amount: parts[0],
+                      name: parts.slice(1).join(' ')
+                  });
+              } else {
+                  // Assume last part is amount (common in Chinese: "酱油 1勺")
+                  const lastPart = parts[parts.length - 1];
+                  const namePart = parts.slice(0, parts.length - 1).join(' ');
+                  newIngredients.push({
+                      name: namePart,
+                      amount: lastPart
+                  });
+              }
+          }
+      });
+
+      if (newIngredients.length > 0) {
+          // If the current list only has one empty item, replace it
+          if (ingredients.length === 1 && !ingredients[0].name && !ingredients[0].amount) {
+              setIngredients(newIngredients);
+          } else {
+              // Append
+              setIngredients([...ingredients, ...newIngredients]);
+          }
+          onShowToast(`已识别 ${newIngredients.length} 项食材`, 'success');
+      }
+      
+      setImportText('');
+      setShowImportModal(false);
+  };
+
   const handleSave = async () => {
     // 1. Validate Title
     if (!title.trim()) {
@@ -108,19 +171,11 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
         return;
     }
     
-    // 2. Validate Ingredients
+    // 2. Filter Ingredients (allow empty list, just filter out blank inputs)
     const validIngredients = ingredients.filter(i => i.name.trim());
-    if (validIngredients.length === 0) {
-        onShowToast("请至少填写一项食材", 'error');
-        return;
-    }
 
-    // 3. Validate Steps
+    // 3. Filter Steps (allow empty list, just filter out blank inputs)
     const validSteps = steps.filter(s => s.trim());
-    if (validSteps.length === 0) {
-        onShowToast("请至少填写一个步骤", 'error');
-        return;
-    }
 
     setIsSaving(true);
 
@@ -298,11 +353,22 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
 
             {/* Ingredients */}
             <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                     <p className="text-xs text-gray-400">配料清单</p>
-                    <button onClick={addIngredient} className="text-xs font-bold text-[#1a472a] flex items-center hover:bg-green-50 px-2 py-1 rounded transition-colors">
-                        <Plus size={12} className="mr-0.5"/> 添加
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setShowImportModal(true)} 
+                            className="text-xs font-bold text-gray-600 flex items-center bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                            <ClipboardPaste size={12} className="mr-1"/> 批量/粘贴
+                        </button>
+                        <button 
+                            onClick={addIngredient} 
+                            className="text-xs font-bold text-[#1a472a] flex items-center bg-green-50 hover:bg-green-100 px-2.5 py-1.5 rounded-lg transition-colors border border-green-100"
+                        >
+                            <Plus size={12} className="mr-0.5"/> 添加一行
+                        </button>
+                    </div>
                 </div>
                 <div className="space-y-2">
                     {ingredients.map((ing, idx) => (
@@ -328,7 +394,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                                     const newI = [...ingredients];
                                     newI.splice(idx, 1);
                                     setIngredients(newI);
-                                }} className="text-gray-300 hover:text-red-400 p-1">
+                                }} className="text-gray-300 hover:text-red-400 p-2 rounded-lg hover:bg-red-50 transition-colors">
                                     <Trash2 size={16} />
                                 </button>
                             )}
@@ -358,7 +424,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                                     rows={3}
                                 />
                             </div>
-                            <button className="mt-3 text-gray-300 hover:text-red-400 p-1" onClick={() => {
+                            <button className="mt-3 text-gray-300 hover:text-red-400 p-2 rounded-lg hover:bg-red-50 transition-colors" onClick={() => {
                                 const newS = [...steps];
                                 newS.splice(idx, 1);
                                 setSteps(newS);
@@ -384,6 +450,54 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
             </Button>
         </div>
         
+        {/* Smart Import Modal */}
+        {showImportModal && (
+            <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+                <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-[#1a472a]">
+                            <ClipboardPaste size={20} />
+                            <h3 className="font-bold text-lg">批量录入食材</h3>
+                        </div>
+                        <button onClick={() => setShowImportModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                            <X size={20} />
+                        </button>
+                    </div>
+                    
+                    <p className="text-xs text-gray-500">
+                        直接粘贴完整的配料表，系统会自动识别名称和用量。
+                        <br/>
+                        格式示例：<span className="font-mono bg-gray-100 px-1 rounded">鸡蛋 2个</span> 或 <span className="font-mono bg-gray-100 px-1 rounded">200g 牛肉</span>
+                    </p>
+
+                    <textarea 
+                        value={importText}
+                        onChange={(e) => setImportText(e.target.value)}
+                        placeholder={`鸡蛋 2个\n牛奶 200ml\n少许 盐`}
+                        className="w-full h-40 bg-gray-50 rounded-xl p-4 text-sm outline-none resize-none text-gray-900 placeholder:text-gray-300 focus:bg-white focus:ring-2 focus:ring-[#1a472a]/10 border border-transparent focus:border-[#1a472a]/20 transition-all"
+                        autoFocus
+                    />
+
+                    <div className="flex gap-3 pt-2">
+                        <button 
+                            onClick={() => setShowImportModal(false)}
+                            className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-200 transition-colors"
+                        >
+                            取消
+                        </button>
+                        <button 
+                            onClick={handleSmartImport}
+                            disabled={!importText.trim()}
+                            className="flex-1 py-3 bg-[#1a472a] text-white rounded-xl font-bold text-sm shadow-lg shadow-green-900/20 hover:bg-[#143620] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            <Sparkles size={16} />
+                            智能识别
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Image Cropper Modal */}
         {isCropping && tempImage && (
             <ImageCropper 

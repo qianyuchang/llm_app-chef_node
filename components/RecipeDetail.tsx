@@ -12,6 +12,7 @@ interface RecipeDetailProps {
   onBack: () => void;
   onEdit: (recipe: Recipe) => void;
   onUpdate: (recipe: Recipe) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
   onShowToast: (message: string, type: ToastType) => void;
 }
 
@@ -32,7 +33,7 @@ const getSourceInfo = (url: string) => {
   return { name: '网页链接', color: 'text-blue-500', bg: 'bg-blue-50', icon: <ExternalLink size={16} /> };
 };
 
-export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEdit, onUpdate, onShowToast }) => {
+export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEdit, onUpdate, onDelete, onShowToast }) => {
   const sourceInfo = recipe.sourceLink ? getSourceInfo(recipe.sourceLink) : null;
   const [showLogModal, setShowLogModal] = useState(false);
   const [newLogImage, setNewLogImage] = useState<string | null>(null);
@@ -124,6 +125,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       }
   };
 
+  const handleDeleteRecipe = async () => {
+      if (!onDelete) return;
+      if (confirm(`确定要删除 "${recipe.title}" 吗？此操作无法撤销。`)) {
+          await onDelete(recipe.id);
+      }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden" {...swipeHandlers}>
       {/* Sticky Header */}
@@ -134,12 +142,23 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
         >
           <ChevronLeft size={24} />
         </button>
-        <button 
-            onClick={() => onEdit(recipe)}
-            className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center text-gray-800 shadow-sm pointer-events-auto hover:bg-white transition-colors"
-        >
-            <SquarePen size={20} />
-        </button>
+        
+        <div className="flex gap-2 pointer-events-auto">
+            {onDelete && (
+                <button 
+                    onClick={handleDeleteRecipe}
+                    className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center text-red-500 shadow-sm hover:bg-red-50 transition-colors"
+                >
+                    <Trash2 size={20} />
+                </button>
+            )}
+            <button 
+                onClick={() => onEdit(recipe)}
+                className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center text-gray-800 shadow-sm hover:bg-white transition-colors"
+            >
+                <SquarePen size={20} />
+            </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24">

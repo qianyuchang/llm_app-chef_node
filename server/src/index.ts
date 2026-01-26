@@ -181,6 +181,28 @@ app.put('/api/recipes/:id', (req, res) => {
   }
 });
 
+app.delete('/api/recipes/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const recipes = db.get('recipes').value();
+    const initialLength = recipes.length;
+    // lowdb v1 remove
+    db.get('recipes').remove({ id }).write();
+    
+    const finalLength = db.get('recipes').value().length;
+    
+    if (initialLength === finalLength) {
+        // Just in case it wasn't found, though remove won't throw
+        // We can treat it as success or 404. 204 No Content is safe.
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting recipe:', error);
+    res.status(500).json({ error: 'Failed to delete recipe' });
+  }
+});
+
 app.get('/api/categories', (req, res) => {
   try {
     const categories = db.get('categories').value();

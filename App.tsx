@@ -89,6 +89,21 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteRecipe = async (id: string) => {
+      try {
+          await api.deleteRecipe(id);
+          setRecipes(prev => prev.filter(r => r.id !== id));
+          setSelectedRecipe(null);
+          // Return to home
+          setDirection(-1);
+          setCurrentView('HOME');
+          showToast('菜谱已删除');
+      } catch (error) {
+          console.error('Failed to delete recipe:', error);
+          showToast('删除失败', 'error');
+      }
+  };
+
   const handleUpdateCategories = async (newCategories: string[]) => {
     try {
       const updatedCategories = await api.updateCategories(newCategories);
@@ -202,6 +217,7 @@ const App: React.FC = () => {
             }}
             onEdit={handleEditRecipe}
             onUpdate={handleSaveRecipe}
+            onDelete={handleDeleteRecipe}
             onShowToast={showToast}
           />
         ) : null;
