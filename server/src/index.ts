@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import db from './db';
@@ -49,12 +50,13 @@ const uploadToR2 = async (base64Data: string): Promise<string> => {
     const buffer = Buffer.from(base64, 'base64');
     
     // Generate unique file name
-    const fileName = `chefnote-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+    const fileName = `recipe-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     
-    // Cloudflare R2 Management API PUT request
+    // Using the Cloudflare API endpoint for R2 object upload
+    // Ensure the token has "R2 Storage: Edit" permission for the account/bucket
     const r2Url = `https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects/${fileName}`;
     
-    console.log(`[R2] Attempting upload: ${fileName} (${buffer.length} bytes)`);
+    console.log(`[R2] Attempting upload to: ${R2_BUCKET}/${fileName} (${buffer.length} bytes)`);
 
     const response = await fetch(r2Url, {
       method: 'PUT',
@@ -62,14 +64,17 @@ const uploadToR2 = async (base64Data: string): Promise<string> => {
         'Authorization': `Bearer ${R2_TOKEN}`,
         'Content-Type': 'image/jpeg',
       },
-      // Using Uint8Array is safer for cross-environment fetch implementations
-      body: new Uint8Array(buffer)
+      // In Node environment, passing the buffer directly to fetch works best
+      body: buffer as any
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[R2] Upload Failed. Status: ${response.status}. Body: ${errorText}`);
-      throw new Error(`Cloudflare R2 API error: ${response.status} ${errorText}`);
+      console.error(`[R2] Upload Failed. Status: ${response.status} ${response.statusText}. Body: ${errorText}`);
+      
+      // If we get an auth error, it's usually token scopes. 
+      // Cloudflare error 10000 = Authentication error.
+      throw new Error(`R2 API Error: ${response.status} - ${errorText}`);
     }
 
     const finalUrl = `https://${R2_CDN_DOMAIN}/${fileName}`;
