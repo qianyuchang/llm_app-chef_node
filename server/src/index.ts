@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { Server } from 'http';
 import { Buffer } from 'buffer';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 // 全局错误捕获，防止因异步错误导致进程崩溃
 (process as any).on('uncaughtException', (err: any) => {
@@ -20,14 +21,24 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 /**
- * Cloudflare R2 配置
- * 注意：我们使用 Cloudflare API Token 方式上传。
- * 这种方式不需要 S3 的 AccessKey/SecretKey，只需要 Token 拥有 "R2 Storage: Edit" 权限。
+ * Cloudflare R2 S3-Compatible 配置
+ * 使用您提供的 S3 凭据和专属 Endpoint
  */
-const R2_ACCOUNT_ID = '12816f3e935015a228c34426bf75125f';
 const R2_BUCKET = 'chefnote';
-const R2_TOKEN = 'L45c4TlBge6JCoQZB8TFAy_Gnptfo82uDQ-_4BeD'; // 您提供的新令牌
+const R2_ENDPOINT = 'https://12816f3e935015a228c34426bf75125f.r2.cloudflarestorage.com';
+const R2_ACCESS_KEY_ID = 'bcf387260b58c035fe8d3cd298736feb';
+const R2_SECRET_ACCESS_KEY = '324ceeb88918f90d46f970ec54403e30d188d1c17d4fcdfae47d5b3a5d9128ec';
 const R2_CDN_DOMAIN = 'cdn.yufish.tech';
+
+// 初始化 S3 客户端
+const s3Client = new S3Client({
+  region: "auto",
+  endpoint: R2_ENDPOINT,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+});
 
 // 初始化 Gemini 客户端
 const apiKey = process.env.API_KEY;
@@ -47,8 +58,8 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }) as any);
 
 /**
- * R2 上传工具函数
- * 使用 Cloudflare API V4: PUT /accounts/:id/r2/buckets/:name/objects/:key
+ * R2 上传工具函数 (使用 S3 协议)
+ * 相比 Management API，S3 协议更适合处理您提供的 Access Key 和 Secret Key。
  */
 const uploadToR2 = async (base64Data: string): Promise<string> => {
   try {
@@ -59,37 +70,26 @@ const uploadToR2 = async (base64Data: string): Promise<string> => {
     // 生成唯一文件名
     const fileName = `recipe-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     
-    // Cloudflare API Endpoint (非 S3 Endpoint，API Token 专用)
-    const r2Url = `https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects/${fileName}`;
-    
-    console.log(`[R2] 正在尝试上传: ${fileName} (${buffer.length} 字节)`);
+    console.log(`[R2] 正在通过 S3 协议上传: ${fileName} (${buffer.length} 字节)`);
 
-    const response = await fetch(r2Url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${R2_TOKEN}`,
-        'Content-Type': 'image/jpeg',
-      },
-      // 使用 Uint8Array 确保在不同环境下的兼容性
-      body: new Uint8Array(buffer)
+    const command = new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: fileName,
+      Body: buffer,
+      ContentType: 'image/jpeg',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[R2] 上传失败. 状态码: ${response.status}. 错误详情: ${errorText}`);
-      
-      // 常见 403 错误原因：
-      // 1. Token 权限不足（需要 R2 Storage: Edit）
-      // 2. Token 已过期
-      // 3. 账户 ID 或 Bucket 名称不匹配
-      throw new Error(`R2 API 错误: ${response.status} - ${errorText}`);
-    }
+    await s3Client.send(command);
 
     const finalUrl = `https://${R2_CDN_DOMAIN}/${fileName}`;
     console.log(`[R2] 上传成功: ${finalUrl}`);
     return finalUrl;
-  } catch (err) {
-    console.error("[R2] 上传过程中发生致命错误:", err);
+  } catch (err: any) {
+    console.error("[R2] S3 上传错误:", err);
+    // 针对 403 权限错误给出明确提示
+    if (err.name === 'Forbidden' || err.$metadata?.httpStatusCode === 403) {
+      throw new Error(`R2 访问拒绝 (403): 请检查您的 S3 访问密钥 (ID/Secret) 是否正确，或 Bucket 名称 "${R2_BUCKET}" 是否存在且具有写权限。`);
+    }
     throw err;
   }
 };
