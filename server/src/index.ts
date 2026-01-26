@@ -9,7 +9,7 @@ import { Server } from 'http';
 import { Buffer } from 'buffer';
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-// 全局错误捕获，防止因异步错误导致进程崩溃
+// 全局错误捕获
 (process as any).on('uncaughtException', (err: any) => {
   console.error('CRITICAL: Uncaught Exception:', err);
 });
@@ -21,10 +21,11 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 /**
- * Cloudflare R2 S3-Compatible 配置
- * 使用您提供的 S3 凭据和专属 Endpoint
+ * Cloudflare R2 S3 配置
+ * 核心：使用 S3 协议访问专属 Endpoint，而不是通过 Cloudflare API v4
  */
 const R2_BUCKET = 'chefnote';
+// 注意：Endpoint 不包含 bucket 名称，SDK 会自动处理
 const R2_ENDPOINT = 'https://12816f3e935015a228c34426bf75125f.r2.cloudflarestorage.com';
 const R2_ACCESS_KEY_ID = 'bcf387260b58c035fe8d3cd298736feb';
 const R2_SECRET_ACCESS_KEY = '324ceeb88918f90d46f970ec54403e30d188d1c17d4fcdfae47d5b3a5d9128ec';
@@ -38,6 +39,8 @@ const s3Client = new S3Client({
     accessKeyId: R2_ACCESS_KEY_ID,
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
+  // R2 推荐开启 forcePathStyle，将 bucket 名称放在路径中而非子域名
+  forcePathStyle: true,
 });
 
 // 初始化 Gemini 客户端
@@ -53,44 +56,45 @@ const ARK_ENDPOINT_ID = process.env.ARK_ENDPOINT_ID;
 const ARK_IMAGE_URL = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
 const ARK_CHAT_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
-// 中间件配置
+// 中间件
 app.use(cors()); 
 app.use(express.json({ limit: '50mb' }) as any);
 
 /**
- * R2 上传工具函数 (使用 S3 协议)
- * 相比 Management API，S3 协议更适合处理您提供的 Access Key 和 Secret Key。
+ * R2 上传工具 (S3 协议实现)
  */
 const uploadToR2 = async (base64Data: string): Promise<string> => {
   try {
-    // 处理 Base64 数据
     const base64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
     const buffer = Buffer.from(base64, 'base64');
-    
-    // 生成唯一文件名
     const fileName = `recipe-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     
-    console.log(`[R2] 正在通过 S3 协议上传: ${fileName} (${buffer.length} 字节)`);
+    console.log(`[R2] 准备上传至 S3 Endpoint: ${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`);
 
     const command = new PutObjectCommand({
       Bucket: R2_BUCKET,
       Key: fileName,
       Body: buffer,
       ContentType: 'image/jpeg',
+      // 如果需要在 S3 层面设置公共读权限（不推荐，建议通过 R2 域名的 Worker 或防火墙规则控制）
+      // ACL: 'public-read', 
     });
 
     await s3Client.send(command);
 
     const finalUrl = `https://${R2_CDN_DOMAIN}/${fileName}`;
-    console.log(`[R2] 上传成功: ${finalUrl}`);
+    console.log(`[R2] 上传成功. CDN 访问路径: ${finalUrl}`);
     return finalUrl;
   } catch (err: any) {
-    console.error("[R2] S3 上传错误:", err);
-    // 针对 403 权限错误给出明确提示
-    if (err.name === 'Forbidden' || err.$metadata?.httpStatusCode === 403) {
-      throw new Error(`R2 访问拒绝 (403): 请检查您的 S3 访问密钥 (ID/Secret) 是否正确，或 Bucket 名称 "${R2_BUCKET}" 是否存在且具有写权限。`);
+    console.error("[R2] S3 上传致命错误:");
+    console.error("错误名称:", err.name);
+    console.error("HTTP 状态码:", err.$metadata?.httpStatusCode);
+    console.error("错误消息:", err.message);
+    
+    if (err.$metadata?.httpStatusCode === 403) {
+      throw new Error("R2 认证失败 (403): 请检查 Access Key 和 Secret Key 是否正确，且该 Key 拥有读写 Bucket 的权限。");
     }
-    throw err;
+    throw new Error(`R2 上传失败: ${err.message}`);
   }
 };
 
@@ -98,7 +102,6 @@ const uploadToR2 = async (base64Data: string): Promise<string> => {
 
 app.get('/', (req, res) => res.send('ChefNote API Server is running.'));
 
-// 图片上传接口
 app.post('/api/upload', async (req, res) => {
   try {
     const { image } = req.body;
@@ -110,7 +113,6 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// 获取所有菜谱
 app.get('/api/recipes', (req, res) => {
   try {
     const recipes = db.get('recipes').value();
@@ -121,7 +123,6 @@ app.get('/api/recipes', (req, res) => {
   }
 });
 
-// 创建新菜谱
 app.post('/api/recipes', (req, res) => {
   try {
     const newRecipe = req.body;
@@ -132,7 +133,6 @@ app.post('/api/recipes', (req, res) => {
   }
 });
 
-// 更新菜谱
 app.put('/api/recipes/:id', (req, res) => {
   try {
     const { id } = req.params;
@@ -145,7 +145,6 @@ app.put('/api/recipes/:id', (req, res) => {
   }
 });
 
-// 删除菜谱
 app.delete('/api/recipes/:id', (req, res) => {
   try {
     db.get('recipes').remove({ id: req.params.id }).write();
@@ -155,14 +154,12 @@ app.delete('/api/recipes/:id', (req, res) => {
   }
 });
 
-// 分类管理接口
 app.get('/api/categories', (req, res) => res.json(db.get('categories').value()));
 app.put('/api/categories', (req, res) => {
   db.set('categories', req.body).write();
   res.json(req.body);
 });
 
-// 设置管理接口
 app.get('/api/settings', (req, res) => res.json(db.get('settings').value() || {}));
 app.put('/api/settings', (req, res) => {
   const current = db.get('settings').value() || {};
@@ -171,7 +168,7 @@ app.put('/api/settings', (req, res) => {
   res.json(newSettings);
 });
 
-// --- AI 助手相关路由 ---
+// --- AI 相关路由 ---
 
 app.post('/api/ai/search', async (req, res) => {
   const modelName = getTextModel();
@@ -252,7 +249,7 @@ app.post('/api/ai/generate-image', async (req, res) => {
             });
             const data = await arkRes.json();
             const base64 = data.data?.[0]?.b64_json;
-            if (!base64) throw new Error("生成图片失败，无数据返回");
+            if (!base64) throw new Error("生成图片失败");
             res.json({ image: base64 }); 
         } else {
             const response = await ai!.models.generateContent({ model: 'gemini-2.5-flash-image', contents: prompt, config: { imageConfig: { aspectRatio: "3:4" } } });
@@ -287,53 +284,30 @@ app.post('/api/ai/optimize-image', async (req, res) => {
     } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
-// 模型名称工具函数
-const getTextModel = () => {
-  const settings = db.get('settings').value();
-  return settings?.aiModel || 'gemini-3-flash-preview';
-};
-const getImageModel = () => {
-    const settings = db.get('settings').value();
-    return settings?.imageModel || 'doubao-seedream-4-5-251128';
-};
+// Helper functions
+const getTextModel = () => db.get('settings').value()?.aiModel || 'gemini-3-flash-preview';
+const getImageModel = () => db.get('settings').value()?.imageModel || 'doubao-seedream-4-5-251128';
 
-// JSON 解析辅助函数
 const safeJsonParse = (text: string) => {
-  if (!text) throw new Error("AI 返回内容为空");
+  if (!text) throw new Error("Empty response");
   try { return JSON.parse(text); } catch (e) {}
   let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
   try { return JSON.parse(clean); } catch (e) {}
-  const firstOpenBrace = clean.indexOf('{');
-  const firstOpenBracket = clean.indexOf('[');
-  let startIndex = -1;
-  let endIndex = -1;
-  if (firstOpenBrace !== -1 && (firstOpenBracket === -1 || firstOpenBrace < firstOpenBracket)) {
-      startIndex = firstOpenBrace;
-      endIndex = clean.lastIndexOf('}');
-  } else if (firstOpenBracket !== -1) {
-      startIndex = firstOpenBracket;
-      endIndex = clean.lastIndexOf(']');
+  const start = Math.max(clean.indexOf('{'), clean.indexOf('['));
+  const end = Math.max(clean.lastIndexOf('}'), clean.lastIndexOf(']'));
+  if (start !== -1 && end !== -1) {
+    try { return JSON.parse(clean.substring(start, end + 1)); } catch (e) {}
   }
-  if (startIndex !== -1 && endIndex !== -1) {
-    const jsonSubstring = clean.substring(startIndex, endIndex + 1);
-    try { return JSON.parse(jsonSubstring); } catch (e) {}
-  }
-  throw new Error(`JSON 解析失败`);
+  throw new Error("JSON Parse Error");
 };
 
 const normalizeMenuResponse = (parsed: any) => {
     if (Array.isArray(parsed)) return { selectedIds: parsed };
     if (parsed && typeof parsed === 'object') {
-        if (Array.isArray(parsed.selectedIds)) return parsed;
-        const possibleKeys = ['selected_recipes', 'recipes', 'ids', 'dishes', 'menu'];
-        for (const key of possibleKeys) if (Array.isArray(parsed[key])) return { ...parsed, selectedIds: parsed[key] };
-        const keys = Object.keys(parsed);
-        for (const key of keys) {
-             const val = parsed[key];
-             if (Array.isArray(val) && (val.length === 0 || typeof val[0] === 'string' || typeof val[0] === 'number')) return { ...parsed, selectedIds: val.map(String) };
-        }
+        const list = parsed.selectedIds || parsed.ids || parsed.recipes;
+        if (Array.isArray(list)) return { ...parsed, selectedIds: list.map(String) };
     }
     return parsed;
 };
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Backend is running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server started on port ${PORT}`));
