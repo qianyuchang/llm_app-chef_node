@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Camera, Link as LinkIcon, Plus, Trash2, ChevronRight, Check, ChefHat, Sparkles, Loader2, ClipboardPaste, X } from 'lucide-react';
 import { Recipe } from '../types';
@@ -36,6 +37,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -52,6 +54,52 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
     }
   }, [initialData]);
 
+  const handleSourceLinkChange = (value: string) => {
+    // 1. Extract URL
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const match = value.match(urlRegex);
+
+    if (match) {
+      const extractedUrl = match[0];
+      setSourceLink(extractedUrl);
+
+      // 2. Extract Title if current title is empty
+      if (!title.trim()) {
+        // Look at text before URL
+        let rawPrefix = value.split(extractedUrl)[0].trim();
+        
+        // Clean up noise: "类似", "复制后打开...", "【小红书】"
+        let cleanTitle = rawPrefix
+          .replace(/类似/g, '')
+          .replace(/【.+】/g, '')
+          .replace(/复制后打开.+/g, '')
+          .trim();
+        
+        if (cleanTitle) {
+          setTitle(cleanTitle);
+          onShowToast("已自动解析菜名", 'success');
+        }
+      }
+    } else {
+      setSourceLink(value);
+    }
+  };
+
+  const handleUploadImage = async (base64: string) => {
+    setIsUploading(true);
+    try {
+      const r2Url = await api.uploadImage(base64);
+      setCoverImage(r2Url);
+      onShowToast("图片已上传至云端", 'success');
+    } catch (err) {
+      console.error(err);
+      setCoverImage(base64); // Fallback to base64
+      onShowToast("上传失败，已转为本地存储", 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -66,9 +114,9 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
   };
 
   const handleCropComplete = (croppedImage: string) => {
-    setCoverImage(croppedImage);
     setIsCropping(false);
     setTempImage(null);
+    handleUploadImage(croppedImage);
   };
 
   const handleGenerateCover = async () => {
@@ -80,43 +128,12 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
       try {
           const prompt = `Professional food photography of ${title}, ${category} dish, high resolution, 4k, delicious, appetizing, cinematic lighting, photorealistic.`;
           const image = await api.generateImage(prompt);
-          setCoverImage(image);
-          onShowToast("封面生成成功", 'success');
+          handleUploadImage(image);
       } catch (error: any) {
           console.error(error);
           onShowToast(`生成失败: ${error.message}`, 'error');
       } finally {
           setIsGeneratingImage(false);
-      }
-  };
-
-  const handleSourceLinkChange = (value: string) => {
-      // URL Extraction Logic
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const match = value.match(urlRegex);
-
-      if (match) {
-          const extractedUrl = match[0];
-          setSourceLink(extractedUrl);
-
-          // If title is empty, try to extract it from the surrounding text
-          if (!title.trim()) {
-              // Get text before the URL, remove common social media clutter
-              let extractedTitle = value.split(extractedUrl)[0].trim();
-              if (extractedTitle) {
-                  // Clean up common "copy-paste" noise
-                  extractedTitle = extractedTitle
-                    .replace(/【.+】/g, '')
-                    .replace(/复制后打开.+/g, '')
-                    .trim();
-                  if (extractedTitle) {
-                      setTitle(extractedTitle);
-                      onShowToast("已自动解析菜名", 'success');
-                  }
-              }
-          }
-      } else {
-          setSourceLink(value);
       }
   };
 
@@ -218,16 +235,16 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
 
       <div className="flex-1 overflow-y-auto px-4 pt-6 space-y-6">
         <div className="flex flex-col items-center justify-center mb-4 relative">
-          <label className={`relative w-32 h-32 rounded-[2rem] bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#1a472a]/50 transition-colors group shadow-sm ${isGeneratingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+          <label className={`relative w-32 h-32 rounded-[2rem] bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#1a472a]/50 transition-colors group shadow-sm ${isGeneratingImage || isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
              {coverImage ? <img src={coverImage} alt="Cover" className="w-full h-full object-cover" /> : <><Camera className="text-gray-400 mb-1 group-hover:text-[#1a472a]" size={24} /><input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} /></>}
-             {isGeneratingImage && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><Loader2 className="animate-spin text-[#1a472a]" /></div>}
+             {(isGeneratingImage || isUploading) && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><Loader2 className="animate-spin text-[#1a472a]" /></div>}
           </label>
            <div className="flex gap-4 mt-3">
                <label className="text-xs text-gray-500 font-medium cursor-pointer flex items-center gap-1 hover:text-gray-800">
                   <Camera size={14} />{coverImage ? '更换照片' : '上传照片'}<input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
                </label>
                <div className="w-[1px] h-4 bg-gray-300"></div>
-               <button onClick={handleGenerateCover} disabled={isGeneratingImage || !title} className="text-xs text-[#1a472a] font-bold flex items-center gap-1 hover:text-green-800 disabled:opacity-50"><Sparkles size={14} />AI 生成封面</button>
+               <button onClick={handleGenerateCover} disabled={isGeneratingImage || !title || isUploading} className="text-xs text-[#1a472a] font-bold flex items-center gap-1 hover:text-green-800 disabled:opacity-50"><Sparkles size={14} />AI 生成封面</button>
            </div>
         </div>
 
@@ -262,7 +279,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
                     <LinkIcon size={16} className="text-gray-400 mr-2" />
                     <input 
                         type="text" 
-                        placeholder="粘贴链接或分享文案 (自动解析)" 
+                        placeholder="粘贴分享文案 (自动解析菜名与链接)" 
                         value={sourceLink}
                         onChange={(e) => handleSourceLinkChange(e.target.value)}
                         className="bg-transparent text-sm w-full outline-none text-gray-700 placeholder-gray-300"

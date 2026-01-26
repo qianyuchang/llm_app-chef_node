@@ -4,27 +4,15 @@ import { Recipe, Settings } from '../types';
 // CONFIGURATION
 // ============================================================================
 
-// Check if running on localhost
 const isLocal = typeof window !== 'undefined' && 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-// Priority:
-// 1. Environment Variable (__API_URL__) - Injected by Vite build 'define'
-// 2. Localhost fallback
-// 3. Fallback hardcoded production URL (Optional/Legacy)
-
-// Declare global constant injected by Vite
-declare const __API_URL__: string;
-
-// Safely access the global constant. 
-// If replacement happens, __API_URL__ becomes a string literal.
-// If not, typeof check prevents crash.
 // @ts-ignore
 const envApiUrl = typeof __API_URL__ !== 'undefined' ? __API_URL__ : '';
 
 export const API_BASE_URL = envApiUrl || (isLocal 
   ? 'http://localhost:3001/api' 
-  : 'https://llmapp-chefnode-production.up.railway.app/api'); // You can replace this later with your Zeabur Backend URL
+  : 'https://llmapp-chefnode-production.up.railway.app/api');
 
 export const api = {
   getRecipes: async (): Promise<Recipe[]> => {
@@ -121,6 +109,21 @@ export const api = {
     return response.json();
   },
 
+  uploadImage: async (base64Image: string): Promise<string> => {
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image: base64Image }),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to upload image to R2');
+    }
+    const data = await response.json();
+    return data.url;
+  },
+
   optimizeImage: async (base64Image: string): Promise<string> => {
     const response = await fetch(`${API_BASE_URL}/ai/optimize-image`, {
         method: 'POST',
@@ -154,7 +157,6 @@ export const api = {
   },
 
   aiSearch: async (query: string, recipes: Recipe[]): Promise<string[]> => {
-      // Send lightweight recipe data
       const lightweightRecipes = recipes.map(r => ({
           id: r.id,
           title: r.title,
