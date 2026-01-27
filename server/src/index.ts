@@ -22,7 +22,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 /**
  * Cloudflare R2 配置 (基于 aws-sdk v2)
- * 完全参考提供的成功示例代码
+ * 已更新为最新提供的凭据
  */
 const R2_BUCKET = 'chefnote';
 const R2_CDN_DOMAIN = 'cdn.yufish.tech';
@@ -30,8 +30,8 @@ const R2_CDN_DOMAIN = 'cdn.yufish.tech';
 // 初始化 S3 客户端 (v2)
 const s3 = new AWS.S3({
   endpoint: 'https://12816f3e935015a228c34426bf75125f.r2.cloudflarestorage.com',
-  accessKeyId: 'bcf387260b58c035fe8d3cd298736feb',
-  secretAccessKey: '324ceeb88918f90d46f970ec54403e30d188d1c17d4fcdfae47d5b3a5d9128ec',
+  accessKeyId: '54db7102c01ddc0888a4db1c20419c84', // Updated
+  secretAccessKey: '95e1686f87b368556c5a1c866ea23835e297e5f4d850a823b7744ce4a9896752', // Updated
   signatureVersion: 'v4',
   region: 'auto', // R2 使用 'auto'
   s3ForcePathStyle: true // 关键：R2 通常需要路径风格访问
