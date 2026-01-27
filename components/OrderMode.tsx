@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ShoppingBag, Sparkles, CheckSquare, Download, X, CheckCircle2, Flame, Share2, Users, Bot, AlertTriangle, Copy, Loader2, Palette } from 'lucide-react';
 import { toBlob } from 'html-to-image';
@@ -6,6 +7,7 @@ import { generateMenuTheme, recommendMenu } from '../services/geminiService';
 import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
 import { PROFICIENCY_TEXT } from '../constants';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface OrderModeProps {
   recipes: Recipe[];
@@ -240,7 +242,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                                 const selected = isSelected(recipe.id);
                                 return (
                                     <div key={recipe.id} onClick={() => toggleSelection(recipe.id)} className={`flex gap-3 group p-2 rounded-2xl transition-all cursor-pointer border ${selected ? 'bg-[#1a472a]/5 border-[#1a472a]/20' : 'bg-transparent border-transparent'}`}>
-                                        <img src={recipe.coverImage} alt={recipe.title} className="w-20 h-20 rounded-xl object-cover bg-gray-100 shadow-sm" />
+                                        <img src={getOptimizedImageUrl(recipe.coverImage, 200)} alt={recipe.title} className="w-20 h-20 rounded-xl object-cover bg-gray-100 shadow-sm" />
                                         <div className="flex-1 flex flex-col justify-between py-1">
                                             <h3 className={`font-bold text-sm ${selected ? 'text-[#1a472a]' : 'text-gray-800'}`}>{recipe.title}</h3>
                                             <div className="flex items-center justify-between">

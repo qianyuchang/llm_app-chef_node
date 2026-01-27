@@ -244,7 +244,7 @@ app.post('/api/ai/generate-image', async (req, res) => {
             const arkRes = await fetch(ARK_IMAGE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
-                body: JSON.stringify({ model: modelName, prompt, size: '2K', response_format: 'b64_json', watermark: false })
+                body: JSON.stringify({ model: modelName, prompt, size: '1024*1024', response_format: 'b64_json', watermark: false })
             });
             const data = await arkRes.json();
             const base64 = data.data?.[0]?.b64_json;
@@ -269,7 +269,7 @@ app.post('/api/ai/optimize-image', async (req, res) => {
             const arkRes = await fetch(ARK_IMAGE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
-                body: JSON.stringify({ model: modelName, prompt: "Artistic food photography style", image, size: '2K', strength: 0.65, response_format: 'b64_json', watermark: false })
+                body: JSON.stringify({ model: modelName, prompt: "Artistic food photography style", image, size: '1024*1024', strength: 0.65, response_format: 'b64_json', watermark: false })
             });
             const data = await arkRes.json();
             const base64 = data.data?.[0]?.b64_json;

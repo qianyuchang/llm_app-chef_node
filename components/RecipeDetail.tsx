@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import { Recipe, CookingLog } from '../types';
@@ -6,6 +7,7 @@ import { ImageCropper } from './ImageCropper';
 import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
 import { api } from '../services/api';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -165,7 +167,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
         {/* Cover Image */}
         <div className="relative h-96 w-full group bg-black">
             <img 
-                src={recipe.coverImage} 
+                src={getOptimizedImageUrl(recipe.coverImage, 1200)} 
                 alt={recipe.title} 
                 className="w-full h-full object-cover opacity-95"
             />
@@ -269,7 +271,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                                     )}
                                     {log.image && (
                                         <div className="relative group shrink-0">
-                                            <img src={log.image} alt="Log" className="w-24 h-24 rounded-xl object-cover bg-gray-100" />
+                                            <img src={getOptimizedImageUrl(log.image, 200)} alt="Log" className="w-24 h-24 rounded-xl object-cover bg-gray-100" />
                                             <button 
                                                 onClick={() => handleSetCover(log.id, log.image)}
                                                 disabled={isProcessingThis}

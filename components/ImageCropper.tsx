@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import Cropper from 'react-easy-crop';
 import { Check, X, Sparkles, Loader2, Eye, RotateCcw } from 'lucide-react';
@@ -54,17 +55,47 @@ async function getCroppedImg(
 
   const data = ctx.getImageData(0, 0, safeArea, safeArea);
 
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  // Resize logic: Limit max dimension to 1080px to save space
+  const MAX_DIMENSION = 1080;
+  let targetWidth = pixelCrop.width;
+  let targetHeight = pixelCrop.height;
 
-  ctx.putImageData(
-    data,
-    0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x,
-    0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y
-  );
+  if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
+     const ratio = targetWidth / targetHeight;
+     if (targetWidth > targetHeight) {
+         targetWidth = MAX_DIMENSION;
+         targetHeight = Math.round(MAX_DIMENSION / ratio);
+     } else {
+         targetHeight = MAX_DIMENSION;
+         targetWidth = Math.round(MAX_DIMENSION * ratio);
+     }
+  }
+
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  // We need to draw the relevant part of the safe-area canvas onto the resized canvas
+  // But standard context.putImageData ignores scaling.
+  // So we use a temporary canvas to hold the full crop, then draw it scaled.
+  
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = pixelCrop.width;
+  tempCanvas.height = pixelCrop.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  
+  if (tempCtx) {
+      tempCtx.putImageData(
+        data,
+        0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x,
+        0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y
+      );
+      
+      // Draw the temp canvas onto the main canvas with scaling
+      ctx.drawImage(tempCanvas, 0, 0, pixelCrop.width, pixelCrop.height, 0, 0, targetWidth, targetHeight);
+  }
 
   return new Promise((resolve) => {
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
   });
 }
 

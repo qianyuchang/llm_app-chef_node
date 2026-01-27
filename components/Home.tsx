@@ -5,6 +5,7 @@ import { Recipe } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { api } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface HomeProps {
   recipes: Recipe[];
@@ -149,7 +150,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
       <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
       <div className="relative w-full overflow-hidden bg-gray-50" style={{ aspectRatio: '3/4' }}>
         <img 
-          src={recipe.coverImage} 
+          src={getOptimizedImageUrl(recipe.coverImage, 600)} 
           alt={recipe.title} 
           className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
@@ -237,7 +238,6 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
           {allCategories.map(cat => (
             <button
               key={cat}
-              // Fixed: Wrap the ref assignment in curly braces to avoid implicit return of HTMLButtonElement, which TypeScript/React 18+ expects to be void or a cleanup function.
               ref={el => { categoryRefs.current[cat] = el; }}
               onClick={() => setActiveCategory(cat)}
               className={`px-5 py-2 rounded-full whitespace-nowrap text-[13px] font-bold transition-all duration-300 ${
