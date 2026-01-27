@@ -7,7 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { Server } from 'http';
 import { Buffer } from 'buffer';
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import AWS from 'aws-sdk';
 
 // 全局错误捕获
 (process as any).on('uncaughtException', (err: any) => {
@@ -21,26 +21,20 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 /**
- * Cloudflare R2 S3 配置
- * 核心：使用 S3 协议访问专属 Endpoint，而不是通过 Cloudflare API v4
+ * Cloudflare R2 配置 (基于 aws-sdk v2)
+ * 完全参考提供的成功示例代码
  */
 const R2_BUCKET = 'chefnote';
-// 注意：Endpoint 不包含 bucket 名称，SDK 会自动处理
-const R2_ENDPOINT = 'https://12816f3e935015a228c34426bf75125f.r2.cloudflarestorage.com';
-const R2_ACCESS_KEY_ID = 'bcf387260b58c035fe8d3cd298736feb';
-const R2_SECRET_ACCESS_KEY = '324ceeb88918f90d46f970ec54403e30d188d1c17d4fcdfae47d5b3a5d9128ec';
 const R2_CDN_DOMAIN = 'cdn.yufish.tech';
 
-// 初始化 S3 客户端
-const s3Client = new S3Client({
-  region: "auto",
-  endpoint: R2_ENDPOINT,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-  // R2 推荐开启 forcePathStyle，将 bucket 名称放在路径中而非子域名
-  forcePathStyle: true,
+// 初始化 S3 客户端 (v2)
+const s3 = new AWS.S3({
+  endpoint: 'https://12816f3e935015a228c34426bf75125f.r2.cloudflarestorage.com',
+  accessKeyId: 'bcf387260b58c035fe8d3cd298736feb',
+  secretAccessKey: '324ceeb88918f90d46f970ec54403e30d188d1c17d4fcdfae47d5b3a5d9128ec',
+  signatureVersion: 'v4',
+  region: 'auto', // R2 使用 'auto'
+  s3ForcePathStyle: true // 关键：R2 通常需要路径风格访问
 });
 
 // 初始化 Gemini 客户端
@@ -61,40 +55,45 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }) as any);
 
 /**
- * R2 上传工具 (S3 协议实现)
+ * R2 上传工具函数
  */
 const uploadToR2 = async (base64Data: string): Promise<string> => {
   try {
+    // 1. 处理 Base64
     const base64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
     const buffer = Buffer.from(base64, 'base64');
-    const fileName = `recipe-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
     
-    console.log(`[R2] 准备上传至 S3 Endpoint: ${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`);
+    // 2. 生成文件名
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(7);
+    const fileName = `recipe-${timestamp}-${randomStr}.jpg`;
 
-    const command = new PutObjectCommand({
+    console.log(`[R2] 正在上传: ${fileName} (${buffer.length} 字节)`);
+
+    // 3. 构建上传参数
+    const params = {
       Bucket: R2_BUCKET,
       Key: fileName,
       Body: buffer,
       ContentType: 'image/jpeg',
-      // 如果需要在 S3 层面设置公共读权限（不推荐，建议通过 R2 域名的 Worker 或防火墙规则控制）
-      // ACL: 'public-read', 
-    });
+      CacheControl: 'public, max-age=31536000'
+      // ACL: 'public-read' // R2 可以在控制台设置公开，或者通过 Worker/CDN 访问，通常不需要在代码里设 ACL
+    };
 
-    await s3Client.send(command);
+    // 4. 执行上传
+    const result = await s3.upload(params).promise();
 
+    // 5. 返回 CDN 链接 (如果配置了 CDN) 或 R2 默认链接
+    // 如果您配置了自定义域名 (cdn.yufish.tech)，我们优先使用它
     const finalUrl = `https://${R2_CDN_DOMAIN}/${fileName}`;
-    console.log(`[R2] 上传成功. CDN 访问路径: ${finalUrl}`);
+    
+    console.log(`[R2] 上传成功. R2 Location: ${result.Location}`);
+    console.log(`[R2] CDN URL: ${finalUrl}`);
+    
     return finalUrl;
   } catch (err: any) {
-    console.error("[R2] S3 上传致命错误:");
-    console.error("错误名称:", err.name);
-    console.error("HTTP 状态码:", err.$metadata?.httpStatusCode);
-    console.error("错误消息:", err.message);
-    
-    if (err.$metadata?.httpStatusCode === 403) {
-      throw new Error("R2 认证失败 (403): 请检查 Access Key 和 Secret Key 是否正确，且该 Key 拥有读写 Bucket 的权限。");
-    }
-    throw new Error(`R2 上传失败: ${err.message}`);
+    console.error("[R2] 上传失败:", err);
+    throw new Error(`图片上传失败: ${err.message}`);
   }
 };
 
