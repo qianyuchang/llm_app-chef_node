@@ -8,7 +8,6 @@ import { ToastType } from './Toast';
 import { Button } from './Button';
 import { useSwipe } from '../hooks/useSwipe';
 import { api } from '../services/api';
-import { compressImage } from '../utils/image';
 
 interface AddRecipeProps {
   categories: string[];
@@ -129,9 +128,7 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
       try {
           const prompt = `Professional food photography of ${title}, ${category} dish, high resolution, 4k, delicious, appetizing, cinematic lighting, photorealistic.`;
           const image = await api.generateImage(prompt);
-          // Compress AI generated image before upload
-          const compressed = await compressImage(image);
-          handleUploadImage(compressed);
+          handleUploadImage(image);
       } catch (error: any) {
           console.error(error);
           onShowToast(`生成失败: ${error.message}`, 'error');

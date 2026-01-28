@@ -239,16 +239,25 @@ app.post('/api/ai/generate-menu', async (req, res) => {
 app.post('/api/ai/generate-image', async (req, res) => {
     const modelName = getImageModel();
     const { prompt } = req.body;
+    
+    // Determine resolution based on model requirements
+    // Seedream 4.5 requires minimum 2K (2048x2048)
+    // Seedream 4.0 supports smaller sizes, defaulting to 1K (1024x1024) for efficiency
+    let size = '1024*1024';
+    if (modelName.includes('4-5')) {
+        size = '2048*2048';
+    }
+
     try {
         if (modelName.startsWith('doubao')) {
             const arkRes = await fetch(ARK_IMAGE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
-                body: JSON.stringify({ model: modelName, prompt, size: '1024*1024', response_format: 'b64_json', watermark: false })
+                body: JSON.stringify({ model: modelName, prompt, size: size, response_format: 'b64_json', watermark: false })
             });
             const data = await arkRes.json();
             const base64 = data.data?.[0]?.b64_json;
-            if (!base64) throw new Error("生成图片失败");
+            if (!base64) throw new Error(data.error?.message || "生成图片失败");
             res.json({ image: base64 }); 
         } else {
             const response = await ai!.models.generateContent({ model: 'gemini-2.5-flash-image', contents: prompt, config: { imageConfig: { aspectRatio: "3:4" } } });
@@ -264,15 +273,23 @@ app.post('/api/ai/generate-image', async (req, res) => {
 app.post('/api/ai/optimize-image', async (req, res) => {
     const { image } = req.body;
     const modelName = getImageModel();
+    
+    // Use the same logic for size as generation
+    let size = '1024*1024';
+    if (modelName.includes('4-5')) {
+        size = '2048*2048';
+    }
+
     try {
         if (modelName.startsWith('doubao')) {
             const arkRes = await fetch(ARK_IMAGE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ARK_API_KEY}` },
-                body: JSON.stringify({ model: modelName, prompt: "Artistic food photography style", image, size: '1024*1024', strength: 0.65, response_format: 'b64_json', watermark: false })
+                body: JSON.stringify({ model: modelName, prompt: "Artistic food photography style", image, size: size, strength: 0.65, response_format: 'b64_json', watermark: false })
             });
             const data = await arkRes.json();
             const base64 = data.data?.[0]?.b64_json;
+            if (!base64) throw new Error(data.error?.message || "优化图片失败");
             res.json({ image: `data:image/png;base64,${base64}` });
         } else {
             const response = await ai!.models.generateContent({ model: 'gemini-2.5-flash-image', contents: { parts: [{ inlineData: { data: image.split(',')[1], mimeType: 'image/jpeg' } }, { text: 'retouch food photography style' }] } });

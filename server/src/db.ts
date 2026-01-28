@@ -1,3 +1,4 @@
+
 import low from 'lowdb';
 import FileSync from 'lowdb/adapters/FileSync';
 import Memory from 'lowdb/adapters/Memory';
@@ -20,7 +21,7 @@ interface Recipe {
 
 interface Settings {
   aiModel: 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-preview-09-2025' | 'doubao-1-5-pro-32k-250115';
-  imageModel?: 'doubao-seedream-4-5-251128';
+  imageModel?: 'doubao-seedream-4-5-251128' | 'doubao-seedream-4-0-250828';
 }
 
 interface DatabaseSchema {

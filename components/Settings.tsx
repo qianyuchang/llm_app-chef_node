@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Zap, BrainCircuit, Check, Loader2, History, Image as ImageIcon, Palette, Bot } from 'lucide-react';
 import { useSwipe } from '../hooks/useSwipe';
@@ -48,7 +49,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     }
   };
 
-  const handleImageModelChange = async (model: 'doubao-seedream-4-5-251128') => {
+  const handleImageModelChange = async (model: 'doubao-seedream-4-5-251128' | 'doubao-seedream-4-0-250828') => {
     if (isSaving || !settings) return;
     
     // Optimistic Update
@@ -180,22 +181,44 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
            <h2 className="text-xs font-bold text-gray-400 mb-2 px-2 uppercase tracking-wide">AI 绘图模型</h2>
            <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
               
-              {/* Doubao Seedream Option */}
+              {/* Doubao Seedream 4.5 Option */}
               <button 
                 onClick={() => handleImageModelChange('doubao-seedream-4-5-251128')}
-                className="w-full flex items-center p-4 hover:bg-gray-50 transition-colors active:bg-gray-100 text-left"
+                className="w-full flex items-center p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors active:bg-gray-100 text-left"
               >
                   <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mr-4 shrink-0">
                       <Palette size={20} />
                   </div>
                   <div className="flex-1">
                       <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-gray-800 text-sm">Doubao Seedream</h3>
-                          <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">New</span>
+                          <h3 className="font-bold text-gray-800 text-sm">Doubao Seedream 4.5</h3>
+                          <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">旗舰</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">火山引擎最新文生图模型，画面质感真实，光影效果极佳。</p>
+                      <p className="text-xs text-gray-400 mt-0.5">极致画质，光影真实。需要 2K 分辨率。</p>
                   </div>
                   {(settings?.imageModel === 'doubao-seedream-4-5-251128' || !settings?.imageModel) && (
+                      <div className="text-[#1a472a]">
+                          {isSaving ? <Loader2 size={18} className="animate-spin"/> : <Check size={20} strokeWidth={3} />}
+                      </div>
+                  )}
+              </button>
+
+              {/* Doubao Seedream 4.0 Option */}
+              <button 
+                onClick={() => handleImageModelChange('doubao-seedream-4-0-250828')}
+                className="w-full flex items-center p-4 hover:bg-gray-50 transition-colors active:bg-gray-100 text-left"
+              >
+                  <div className="w-10 h-10 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center mr-4 shrink-0">
+                      <ImageIcon size={20} />
+                  </div>
+                  <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-gray-800 text-sm">Doubao Seedream 4.0</h3>
+                          <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">省流</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">均衡模式，支持 1K 低分辨率生成，节省流量。</p>
+                  </div>
+                  {settings?.imageModel === 'doubao-seedream-4-0-250828' && (
                       <div className="text-[#1a472a]">
                           {isSaving ? <Loader2 size={18} className="animate-spin"/> : <Check size={20} strokeWidth={3} />}
                       </div>
@@ -210,7 +233,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm p-4">
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-800">版本</span>
-                    <span className="text-gray-500">v1.2.0</span>
+                    <span className="text-gray-500">v1.2.1</span>
                 </div>
                 <div className="flex justify-between items-center text-sm mt-3 pt-3 border-t border-gray-50">
                     <span className="text-gray-800">开发者</span>
