@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, Zap, BrainCircuit, Check, Loader2, History, Image as ImageIcon, Palette, Bot } from 'lucide-react';
+import { ChevronLeft, Zap, BrainCircuit, Check, Loader2, History, Image as ImageIcon, Palette, Bot, Upload } from 'lucide-react';
 import { useSwipe } from '../hooks/useSwipe';
 import { Settings as SettingsType } from '../types';
 import { api } from '../services/api';
@@ -13,6 +13,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
@@ -65,6 +66,21 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSyncImages = async () => {
+      if (isSyncing) return;
+      if (!confirm('这将把所有本地存储的图片上传到 Cloudflare R2 云存储。是否继续？')) return;
+
+      setIsSyncing(true);
+      try {
+          const res = await api.syncImages();
+          alert(`同步完成！\n成功上传: ${res.processed} 张\n失败: ${res.errors} 张`);
+      } catch (e: any) {
+          alert(`同步失败: ${e.message}`);
+      } finally {
+          setIsSyncing(false);
+      }
   };
 
   if (isLoading) {
@@ -223,6 +239,26 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                           {isSaving ? <Loader2 size={18} className="animate-spin"/> : <Check size={20} strokeWidth={3} />}
                       </div>
                   )}
+              </button>
+           </div>
+        </div>
+
+        {/* Storage Management */}
+        <div>
+           <h2 className="text-xs font-bold text-gray-400 mb-2 px-2 uppercase tracking-wide">存储管理</h2>
+           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+              <button 
+                onClick={handleSyncImages}
+                disabled={isSyncing}
+                className="w-full flex items-center p-4 hover:bg-gray-50 transition-colors active:bg-gray-100 text-left disabled:opacity-50"
+              >
+                  <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center mr-4 shrink-0">
+                      {isSyncing ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                  </div>
+                  <div className="flex-1">
+                      <h3 className="font-bold text-gray-800 text-sm">一键同步图片到云端</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">将本地 Base64 图片上传到 Cloudflare R2，减少数据库体积。</p>
+                  </div>
               </button>
            </div>
         </div>

@@ -112,6 +112,73 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
+// 新增：一键同步 Base64 图片到 R2
+app.post('/api/sync-images', async (req, res) => {
+  console.log('[Sync] Starting image sync process...');
+  try {
+    const recipes = db.get('recipes').value();
+    let processedCount = 0;
+    let errorCount = 0;
+
+    // 辅助函数：判断是否需要上传
+    const shouldUpload = (url: string) => {
+      return url && (url.startsWith('data:image') || (url.length > 1000 && !url.startsWith('http')));
+    };
+
+    // 遍历所有菜谱
+    for (let i = 0; i < recipes.length; i++) {
+      const recipe = recipes[i];
+      let changed = false;
+
+      // 1. 检查封面图
+      if (shouldUpload(recipe.coverImage)) {
+        try {
+          console.log(`[Sync] Uploading cover for recipe: ${recipe.title}`);
+          const newUrl = await uploadToR2(recipe.coverImage);
+          recipe.coverImage = newUrl;
+          changed = true;
+          processedCount++;
+        } catch (e) {
+          console.error(`[Sync] Failed to upload cover for ${recipe.title}`, e);
+          errorCount++;
+        }
+      }
+
+      // 2. 检查烹饪记录图片
+      if (recipe.logs && recipe.logs.length > 0) {
+        for (let j = 0; j < recipe.logs.length; j++) {
+          const log = recipe.logs[j];
+          if (shouldUpload(log.image)) {
+            try {
+              console.log(`[Sync] Uploading log image for recipe: ${recipe.title}`);
+              const newUrl = await uploadToR2(log.image);
+              log.image = newUrl;
+              changed = true;
+              processedCount++;
+            } catch (e) {
+              console.error(`[Sync] Failed to upload log image for ${recipe.title}`, e);
+              errorCount++;
+            }
+          }
+        }
+      }
+    }
+
+    // 如果有变更，写入数据库
+    if (processedCount > 0) {
+      db.set('recipes', recipes).write();
+      console.log(`[Sync] Database updated. Processed: ${processedCount}`);
+    } else {
+      console.log('[Sync] No images needed syncing.');
+    }
+
+    res.json({ processed: processedCount, errors: errorCount });
+  } catch (error: any) {
+    console.error('[Sync] Critical error:', error);
+    res.status(500).json({ error: error.message || "同步失败" });
+  }
+});
+
 app.get('/api/recipes', (req, res) => {
   try {
     const recipes = db.get('recipes').value();

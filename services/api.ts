@@ -131,6 +131,18 @@ export const api = {
     }
   },
 
+  // One-click sync logic
+  syncImages: async (): Promise<{ processed: number, errors: number }> => {
+    const response = await fetch(`${API_BASE_URL}/sync-images`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Sync failed');
+    }
+    return response.json();
+  },
+
   optimizeImage: async (base64Image: string): Promise<string> => {
     const response = await fetch(`${API_BASE_URL}/ai/optimize-image`, {
         method: 'POST',
