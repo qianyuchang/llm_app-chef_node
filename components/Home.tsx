@@ -30,7 +30,6 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   const [activeCategory, setActiveCategory] = useState<string>('全部');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // AI Search State
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [aiRecipeIds, setAiRecipeIds] = useState<string[] | null>(null);
   const [isAiSearching, setIsAiSearching] = useState(false);
@@ -38,15 +37,8 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   const categoryTabContainerRef = useRef<HTMLDivElement>(null);
   const categoryRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  // Swipe state
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const minSwipeDistance = 60;
-
   const allCategories = ['全部', ...categories];
 
-  // Sync scroll of category tabs
   useEffect(() => {
     const activeTab = categoryRefs.current[activeCategory];
     if (activeTab && categoryTabContainerRef.current) {
@@ -67,39 +59,6 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Swipe logic
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-    setTouchStartY(e.targetTouches[0].clientY);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart || !touchEnd || !touchStartY) return;
-    
-    const distanceX = touchStart - touchEnd;
-    const distanceY = touchStartY - e.changedTouches[0].clientY;
-    
-    // Ensure it's more of a horizontal swipe than a vertical scroll
-    if (Math.abs(distanceX) > Math.abs(distanceY) * 1.5) {
-        const isLeftSwipe = distanceX > minSwipeDistance;
-        const isRightSwipe = distanceX < -minSwipeDistance;
-
-        if (isLeftSwipe || isRightSwipe) {
-            const currentIndex = allCategories.indexOf(activeCategory);
-            if (isLeftSwipe && currentIndex < allCategories.length - 1) {
-                setActiveCategory(allCategories[currentIndex + 1]);
-            } else if (isRightSwipe && currentIndex > 0) {
-                setActiveCategory(allCategories[currentIndex - 1]);
-            }
-        }
-    }
-  };
 
   const filteredRecipes = recipes.filter(r => {
     const matchesCategory = activeCategory === '全部' || r.category === activeCategory;
@@ -142,39 +101,44 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   const rightColRecipes = filteredRecipes.filter((_, idx) => idx % 2 !== 0);
 
   const renderRecipeCard = (recipe: Recipe) => (
-    <motion.div 
-      layout
+    <div 
       key={recipe.id} 
       onClick={() => onRecipeClick(recipe)}
-      className="bg-white rounded-[20px] overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 transition-transform duration-200 active:scale-[0.98]"
+      className="bg-white rounded-[20px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 transition-all duration-200 active:scale-[0.98] active:shadow-none"
     >
-      <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
-      <div className="relative w-full overflow-hidden bg-gray-50" style={{ aspectRatio: '3/4' }}>
+      {/* 比例容器 */}
+      <div className="relative w-full overflow-hidden bg-gray-100" style={{ aspectRatio: '3/4' }}>
         <ImageWithSkeleton 
           src={getOptimizedImageUrl(recipe.coverImage, 600)} 
           alt={recipe.title} 
-          className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-105"
+          className="transition-transform duration-700 group-hover:scale-105"
+          wrapperClassName="absolute inset-0"
           loading="lazy"
         />
-        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm flex items-center justify-center z-10">
-           <span className="text-[10px] text-[#385c44] font-bold tracking-wide leading-none pt-[1px]">
+        
+        {/* 覆盖层组件 */}
+        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full shadow-sm z-10">
+           <span className="text-[10px] text-[#385c44] font-bold tracking-tight leading-none pt-[1px]">
              {PROFICIENCY_TEXT[recipe.proficiency]}
            </span>
         </div>
         {recipe.logs && recipe.logs.length > 0 && (
-            <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10 z-10">
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/30 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10 z-10">
                 <Flame size={10} fill="currentColor" className="text-orange-400" />
                 {recipe.logs.length}
             </div>
         )}
       </div>
+
       <div className="p-4">
-        <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
-        <span className="text-[10px] font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
-          {recipe.category}
-        </span>
+        <h3 className="font-bold text-gray-900 text-[14px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
+        <div className="flex items-center">
+            <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+            {recipe.category}
+            </span>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 
   return (
@@ -251,18 +215,13 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
         </div>
       </div>
 
-      <div 
-        className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6] touch-pan-y relative"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
+      <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
         <AnimatePresence mode="wait">
             <motion.div 
                 key={activeCategory + (aiRecipeIds ? 'search' : '')}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
                 className="w-full"
             >
@@ -273,8 +232,8 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
                     </div>
                 ) : filteredRecipes.length > 0 ? (
                     <div className="flex gap-4 items-start">
-                        <div className="flex-1 flex flex-col gap-4">{leftColRecipes.map(renderRecipeCard)}</div>
-                        <div className="flex-1 flex flex-col gap-4">{rightColRecipes.map(renderRecipeCard)}</div>
+                        <div className="flex-1 flex flex-col">{leftColRecipes.map(renderRecipeCard)}</div>
+                        <div className="flex-1 flex flex-col">{rightColRecipes.map(renderRecipeCard)}</div>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center pt-24 text-center">

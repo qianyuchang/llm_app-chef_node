@@ -164,8 +164,8 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
 
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden" {...swipeHandlers}>
-      {/* Sticky Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start pointer-events-none">
+      {/* Header Controls (z-30 to stay above everything) */}
+      <div className="absolute top-0 left-0 right-0 p-4 z-30 flex justify-between items-start pointer-events-none">
         <button 
           onClick={onBack} 
           className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center text-gray-800 shadow-sm pointer-events-auto hover:bg-white transition-colors"
@@ -197,22 +197,28 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24">
-        {/* Cover Image */}
-        <div className="relative h-96 w-full group bg-black">
+      <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
+        {/* Cover Image Wrapper */}
+        <div className="relative h-[420px] w-full group bg-black overflow-hidden">
             <ImageWithSkeleton 
                 src={getOptimizedImageUrl(recipe.coverImage, 1200)} 
+                lowResSrc={getOptimizedImageUrl(recipe.coverImage, 600)} 
                 alt={recipe.title} 
-                className="w-full h-full object-cover opacity-95"
+                className="w-full h-full object-cover"
+                // @ts-ignore
+                fetchpriority="high"
+                loading="eager"
             />
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
+            {/* Gradient Mask (z-20 to ensure it's above the loaded image) */}
+            <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white via-white/80 to-transparent z-20 pointer-events-none"></div>
         </div>
 
-        <div className="px-6 -mt-10 relative z-10">
+        {/* Content Area (z-20 to be at same level as mask) */}
+        <div className="px-6 -mt-20 relative z-20">
             {/* Title & Stats */}
             <div className="mb-8">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="px-3 py-1 rounded-full bg-[#f0fdf4] text-[#1a472a] text-xs font-bold tracking-wide shadow-sm border border-[#1a472a]/10 flex items-center justify-center leading-none">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="px-3 py-1 rounded-full bg-[#f0fdf4] text-[#1a472a] text-[11px] font-bold tracking-wide shadow-sm border border-[#1a472a]/10 flex items-center justify-center leading-none">
                         <span className="pt-[1px]">{recipe.category}</span>
                     </div>
                     {sourceInfo && recipe.sourceLink && (
@@ -220,7 +226,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                             href={recipe.sourceLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${sourceInfo.bg} ${sourceInfo.color} text-xs font-medium hover:opacity-80 transition-opacity leading-none`}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${sourceInfo.bg} ${sourceInfo.color} text-[11px] font-medium hover:opacity-80 transition-opacity leading-none`}
                         >
                             {sourceInfo.icon}
                             <span className="pt-[1px]">来源</span>
@@ -229,13 +235,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2 leading-tight">{recipe.title}</h1>
                 <div className="flex items-center gap-4 text-gray-500 text-sm mt-3">
-                    <div className="flex items-center gap-1.5">
-                        <div className="flex gap-0.5">
+                    <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
                              {[...Array(5)].map((_, i) => (
-                                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < recipe.proficiency ? 'bg-[#1a472a]' : 'bg-gray-200'}`} />
+                                <div key={i} className={`w-2 h-2 rounded-full ${i < recipe.proficiency ? 'bg-[#1a472a]' : 'bg-gray-200'}`} />
                             ))}
                         </div>
-                        <span className="text-xs font-medium text-[#1a472a]">{PROFICIENCY_TEXT[recipe.proficiency]}</span>
+                        <span className="text-xs font-bold text-[#1a472a] tracking-tight">{PROFICIENCY_TEXT[recipe.proficiency]}</span>
                     </div>
                 </div>
             </div>
@@ -243,18 +249,18 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
             {/* Ingredients */}
             <div className="mb-8">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#1a472a] rounded-full"></span>
+                    <span className="w-1.5 h-5 bg-[#1a472a] rounded-full"></span>
                     所需食材
                 </h2>
                 <div className="bg-[#f7f8fa] rounded-2xl p-5 space-y-3 shadow-sm border border-gray-100">
                     {recipe.ingredients.map((ing, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-200/50 last:border-0 pb-2 last:pb-0">
+                        <div key={idx} className="flex justify-between items-center text-[15px] border-b border-gray-200/50 last:border-0 pb-2.5 last:pb-0 pt-0.5">
                             <span className="text-gray-700 font-medium">{ing.name}</span>
-                            <span className="text-gray-500 font-mono">{ing.amount}</span>
+                            <span className="text-gray-500 font-mono font-medium">{ing.amount}</span>
                         </div>
                     ))}
                     {recipe.ingredients.length === 0 && (
-                        <p className="text-gray-400 text-sm italic">暂无食材记录</p>
+                        <p className="text-gray-400 text-sm italic py-2">暂无食材记录</p>
                     )}
                 </div>
             </div>
@@ -262,16 +268,16 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
             {/* Steps */}
             <div className="mb-12">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#1a472a] rounded-full"></span>
+                    <span className="w-1.5 h-5 bg-[#1a472a] rounded-full"></span>
                     烹饪步骤
                 </h2>
-                <div className="space-y-6">
+                <div className="space-y-7">
                     {recipe.steps.map((step, idx) => (
                         <div key={idx} className="flex gap-4">
-                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1a472a] text-white flex items-center justify-center text-xs font-bold mt-0.5 shadow-sm shadow-green-900/20">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1a472a] text-white flex items-center justify-center text-xs font-bold mt-1 shadow-sm shadow-green-900/20">
                                 {idx + 1}
                             </div>
-                            <p className="text-gray-700 leading-relaxed text-[15px] pt-0.5 whitespace-pre-line">
+                            <p className="text-gray-700 leading-relaxed text-[16px] pt-0.5 whitespace-pre-line flex-1">
                                 {step}
                             </p>
                         </div>
@@ -285,28 +291,28 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
             {/* Cooking Logs Section */}
             <div className="mb-12">
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#1a472a] rounded-full"></span>
+                    <span className="w-1.5 h-5 bg-[#1a472a] rounded-full"></span>
                     烹饪记录
                 </h2>
                 <div className="space-y-4">
                      {(!recipe.logs || recipe.logs.length === 0) ? (
-                        <div className="text-center py-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400 text-sm">
+                        <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400 text-sm">
                             还没有记录，点击右下角添加第一次烹饪吧！
                         </div>
                      ) : (
                          recipe.logs.map(log => {
                              const isProcessingThis = processingLogId === log.id;
                              return (
-                                <div key={log.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex gap-3 relative overflow-hidden">
+                                <div key={log.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex gap-4 relative overflow-hidden">
                                     {isProcessingThis && (
                                         <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
                                             <Loader2 className="animate-spin text-[#1a472a]" />
                                         </div>
                                     )}
                                     {log.image && (
-                                        <div className="relative group shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-gray-100">
+                                        <div className="relative group shrink-0 w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shadow-inner">
                                             <ImageWithSkeleton 
-                                                src={getOptimizedImageUrl(log.image, 200)} 
+                                                src={getOptimizedImageUrl(log.image, 300)} 
                                                 alt="Log" 
                                                 className="w-full h-full object-cover" 
                                             />
@@ -320,18 +326,20 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                                             </button>
                                         </div>
                                     )}
-                                    <div className="flex-1 flex flex-col">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className="text-xs text-gray-400 font-medium">{new Date(log.date).toLocaleDateString()}</span>
-                                            <button 
-                                                onClick={() => handleDeleteLog(log.id)} 
-                                                disabled={isProcessingThis}
-                                                className="text-gray-300 hover:text-red-400 p-1 disabled:opacity-50"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                    <div className="flex-1 flex flex-col justify-between py-1">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.date).toLocaleDateString()}</span>
+                                                <button 
+                                                    onClick={() => handleDeleteLog(log.id)} 
+                                                    disabled={isProcessingThis}
+                                                    className="text-gray-300 hover:text-red-400 p-1 disabled:opacity-50"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{log.note}</p>
                                         </div>
-                                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap flex-1">{log.note}</p>
                                     </div>
                                 </div>
                              );
@@ -345,7 +353,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                     href={recipe.sourceLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-4 bg-gray-50 text-center text-gray-500 text-sm rounded-xl hover:bg-gray-100 transition-colors border border-gray-100 mb-8"
+                    className="flex items-center justify-center gap-2 w-full py-4 bg-gray-50 text-center text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-100 transition-colors border border-gray-100 mb-8"
                 >
                     <ExternalLink size={16} />
                     查看原教程

@@ -248,6 +248,7 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                                                 src={getOptimizedImageUrl(recipe.coverImage, 200)} 
                                                 alt={recipe.title} 
                                                 className="w-full h-full object-cover" 
+                                                wrapperClassName="absolute inset-0"
                                             />
                                         </div>
                                         <div className="flex-1 flex flex-col justify-between py-1">
