@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, SquarePen, ExternalLink, Youtube, Camera, X, Trash2, Image as ImageIcon, Check, Loader2, Share2 } from 'lucide-react';
 import { Recipe, CookingLog } from '../types';
 import { PROFICIENCY_TEXT } from '../constants';
 import { ImageCropper } from './ImageCropper';
@@ -48,10 +48,40 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
 
   // Loading State
   const [isSaving, setIsSaving] = useState(false);
-  const [processingLogId, setProcessingLogId] = useState<string | null>(null); // For individual log deletion/cover set
+  const [processingLogId, setProcessingLogId] = useState<string | null>(null);
 
   // Swipe Handler
   const swipeHandlers = useSwipe(onBack);
+
+  const handleShare = async () => {
+    const ingredientsPreview = recipe.ingredients.slice(0, 3).map(i => i.name).join('、');
+    const shareTitle = `👨‍🍳 来看我发现的美味：${recipe.title}`;
+    const shareText = `【${recipe.title}】需要食材：${ingredientsPreview}${recipe.ingredients.length > 3 ? '等' : ''}。点击查看完整厨房笔记！`;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          onShowToast("分享失败", 'error');
+        }
+      }
+    } else {
+      // Fallback: Copy beautiful text to clipboard
+      const copyContent = `${shareTitle}\n\n${shareText}\n${shareUrl}\n\n—— 来自 ChefNote 厨房笔记`;
+      try {
+        await navigator.clipboard.writeText(copyContent);
+        onShowToast("已生成分享文案并复制", 'success');
+      } catch (err) {
+        onShowToast("复制失败", 'error');
+      }
+    }
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,7 +118,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
 
     const updatedRecipe = {
       ...recipe,
-      logs: [newLog, ...(recipe.logs || [])] // Prepend new log
+      logs: [newLog, ...(recipe.logs || [])]
     };
 
     try {
@@ -97,7 +127,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
         setNewLogImage(null);
         setNewLogNote('');
     } catch (e) {
-        // Error handled in App.tsx
     } finally {
         setIsSaving(false);
     }
@@ -110,7 +139,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       try {
         await onUpdate({ ...recipe, logs: updatedLogs });
       } catch (e) {
-        // Error handled
       } finally {
         setProcessingLogId(null);
       }
@@ -122,7 +150,6 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       try {
         await onUpdate({...recipe, coverImage: imgUrl});
       } catch (e) {
-          // Error handled
       } finally {
         setProcessingLogId(null);
       }
@@ -147,6 +174,12 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
         </button>
         
         <div className="flex gap-2 pointer-events-auto">
+            <button 
+                onClick={handleShare}
+                className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center text-[#1a472a] shadow-sm hover:bg-white transition-colors"
+            >
+                <Share2 size={20} />
+            </button>
             {onDelete && (
                 <button 
                     onClick={handleDeleteRecipe}
@@ -393,7 +426,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                     setIsCropping(false);
                     setTempImage(null);
                 }}
-                aspect={1} // 1:1 for logs usually looks good, or could be 3/4
+                aspect={1}
             />
         )}
     </div>
