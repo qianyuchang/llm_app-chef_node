@@ -57,7 +57,10 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
     const ingredientsPreview = recipe.ingredients.slice(0, 3).map(i => i.name).join('、');
     const shareTitle = `👨‍🍳 来看我发现的美味：${recipe.title}`;
     const shareText = `【${recipe.title}】需要食材：${ingredientsPreview}${recipe.ingredients.length > 3 ? '等' : ''}。点击查看完整厨房笔记！`;
-    const shareUrl = window.location.href;
+    
+    // Create direct recipe link using hash routing
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = `${baseUrl}#/recipe/${recipe.id}`;
 
     if (navigator.share) {
       try {

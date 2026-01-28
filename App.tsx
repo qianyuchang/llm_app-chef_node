@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Home } from './components/Home';
 import { AddRecipe } from './components/AddRecipe';
 import { OrderMode } from './components/OrderMode';
@@ -21,12 +22,41 @@ const App: React.FC = () => {
   
   // Navigation Direction (1 = push, -1 = pop)
   const [direction, setDirection] = useState(0);
+  const [homeScrollTop, setHomeScrollTop] = useState(0);
 
   // Toast State
   const [toast, setToast] = useState<{message: string, type: ToastType} | null>(null);
 
   const showToast = (message: string, type: ToastType = 'success') => {
     setToast({ message, type });
+  };
+
+  // --- Router Logic ---
+  const syncStateWithHash = (recipesList: Recipe[]) => {
+    const hash = window.location.hash;
+    
+    if (!hash || hash === '#/') {
+      setCurrentView('HOME');
+      setSelectedRecipe(null);
+    } else if (hash.startsWith('#/recipe/')) {
+      const id = hash.replace('#/recipe/', '');
+      const recipe = recipesList.find(r => r.id === id);
+      if (recipe) {
+        setSelectedRecipe(recipe);
+        setCurrentView('RECIPE_DETAIL');
+      } else {
+        window.location.hash = '#/';
+      }
+    } else if (hash === '#/add') {
+      setSelectedRecipe(null);
+      setCurrentView('ADD_RECIPE');
+    } else if (hash === '#/order') {
+      setCurrentView('ORDER_MODE');
+    } else if (hash === '#/categories') {
+      setCurrentView('CATEGORY_MANAGER');
+    } else if (hash === '#/settings') {
+      setCurrentView('SETTINGS');
+    }
   };
 
   useEffect(() => {
@@ -38,6 +68,7 @@ const App: React.FC = () => {
         ]);
         setRecipes(fetchedRecipes);
         setCategories(fetchedCategories);
+        syncStateWithHash(fetchedRecipes);
       } catch (error) {
         console.error('Failed to fetch data:', error);
         showToast('数据加载失败，请刷新重试', 'error');
@@ -46,61 +77,78 @@ const App: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+
+    const handleHashChange = () => {
+      // Re-sync state when user clicks back button or shares link
+      syncStateWithHash(recipes);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [recipes.length]); // Re-sync if list changes
+
+  const updateHash = (view: ViewState, recipe?: Recipe | null) => {
+    let newHash = '#/';
+    switch (view) {
+      case 'RECIPE_DETAIL': newHash = `#/recipe/${recipe?.id}`; break;
+      case 'ADD_RECIPE': newHash = recipe ? `#/recipe/${recipe.id}/edit` : '#/add'; break; // Simplified edit route
+      case 'ORDER_MODE': newHash = '#/order'; break;
+      case 'CATEGORY_MANAGER': newHash = '#/categories'; break;
+      case 'SETTINGS': newHash = '#/settings'; break;
+      default: newHash = '#/';
+    }
+    if (window.location.hash !== newHash) {
+      window.location.hash = newHash;
+    }
+  };
+
+  const navigateTo = (view: ViewState, dir: number, recipe?: Recipe | null) => {
+      setDirection(dir);
+      setCurrentView(view);
+      setSelectedRecipe(recipe || null);
+      updateHash(view, recipe);
+  };
 
   const handleSaveRecipe = async (recipeData: Omit<Recipe, 'id' | 'createdAt'> | Recipe) => {
     if ('id' in recipeData) {
-      // Editing existing recipe
       try {
         const updatedRecipe = await api.updateRecipe(recipeData as Recipe);
         setRecipes(prev => prev.map(r => r.id === updatedRecipe.id ? updatedRecipe : r));
-        setSelectedRecipe(updatedRecipe); 
-        
-        if (currentView === 'ADD_RECIPE') {
-             setDirection(1); // Push to detail
-             setCurrentView('RECIPE_DETAIL');
-        }
+        navigateTo('RECIPE_DETAIL', 1, updatedRecipe);
         showToast('菜谱更新成功');
       } catch (error) {
-        console.error('Failed to update recipe:', error);
         showToast('保存失败: ' + (error as Error).message, 'error');
-        throw error; // Re-throw so child component can stop loading
+        throw error;
       }
     } else {
-      // Creating new recipe
       const newRecipe: Recipe = {
         ...recipeData,
         id: Date.now().toString(),
         createdAt: Date.now(),
         logs: []
       };
-      
       try {
         const savedRecipe = await api.createRecipe(newRecipe);
         setRecipes(prev => [savedRecipe, ...prev]);
-        setDirection(-1); // Pop back to home
-        setCurrentView('HOME');
+        navigateTo('HOME', -1);
         showToast('新菜谱已添加');
       } catch (error) {
-        console.error('Failed to create recipe:', error);
         showToast('创建失败: ' + (error as Error).message, 'error');
-        throw error; // Re-throw so child component can stop loading
+        throw error;
       }
     }
   };
 
   const handleDeleteRecipe = async (id: string) => {
-      try {
-          await api.deleteRecipe(id);
-          setRecipes(prev => prev.filter(r => r.id !== id));
-          setSelectedRecipe(null);
-          // Return to home
-          setDirection(-1);
-          setCurrentView('HOME');
-          showToast('菜谱已删除');
-      } catch (error) {
-          console.error('Failed to delete recipe:', error);
-          showToast('删除失败', 'error');
+      if (confirm('确定要删除吗？')) {
+          try {
+              await api.deleteRecipe(id);
+              setRecipes(prev => prev.filter(r => r.id !== id));
+              navigateTo('HOME', -1);
+              showToast('菜谱已删除');
+          } catch (error) {
+              showToast('删除失败', 'error');
+          }
       }
   };
 
@@ -110,7 +158,6 @@ const App: React.FC = () => {
       setCategories(updatedCategories);
       showToast('分类已更新');
     } catch (error) {
-      console.error('Failed to update categories:', error);
       showToast('分类更新失败', 'error');
       throw error;
     }
@@ -118,47 +165,15 @@ const App: React.FC = () => {
 
   const handleRenameCategory = async (oldName: string, newName: string) => {
     try {
-      // 1. Update Category List
       const newCategoryList = categories.map(c => c === oldName ? newName : c);
       await api.updateCategories(newCategoryList);
       setCategories(newCategoryList);
-
-      // 2. Find and Update all recipes that belong to this category
-      const recipesToUpdate = recipes.filter(r => r.category === oldName);
-      
-      // Update them one by one (in a real backend, this might be a batch operation)
-      await Promise.all(recipesToUpdate.map(async (recipe) => {
-        const updated = { ...recipe, category: newName };
-        await api.updateRecipe(updated);
-        return updated;
-      }));
-
-      // 3. Update local state
       setRecipes(prev => prev.map(r => r.category === oldName ? { ...r, category: newName } : r));
-      
       showToast('分类重命名成功');
     } catch (error) {
-      console.error('Failed to rename category:', error);
       showToast('重命名失败', 'error');
       throw error;
     }
-  };
-
-  const handleRecipeClick = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
-    setDirection(1); // Push
-    setCurrentView('RECIPE_DETAIL');
-  };
-
-  const handleEditRecipe = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
-    setDirection(1); // Push
-    setCurrentView('ADD_RECIPE');
-  };
-
-  const navigateTo = (view: ViewState, dir: number) => {
-      setDirection(dir);
-      setCurrentView(view);
   };
 
   const renderViewContent = () => {
@@ -168,8 +183,10 @@ const App: React.FC = () => {
           <Home 
             recipes={recipes} 
             categories={categories}
+            initialScrollTop={homeScrollTop}
+            onScroll={(top) => setHomeScrollTop(top)}
             onOrderModeClick={() => navigateTo('ORDER_MODE', 1)}
-            onRecipeClick={handleRecipeClick}
+            onRecipeClick={(r) => navigateTo('RECIPE_DETAIL', 1, r)}
             onSettingsClick={() => navigateTo('SETTINGS', 1)}
           />
         );
@@ -178,8 +195,8 @@ const App: React.FC = () => {
           <AddRecipe 
             categories={categories}
             onBack={() => {
-                if (selectedRecipe && currentView === 'ADD_RECIPE') {
-                     navigateTo('RECIPE_DETAIL', -1);
+                if (selectedRecipe) {
+                     navigateTo('RECIPE_DETAIL', -1, selectedRecipe);
                 } else {
                      navigateTo('HOME', -1);
                 }
@@ -211,11 +228,8 @@ const App: React.FC = () => {
         return selectedRecipe ? (
           <RecipeDetail 
             recipe={selectedRecipe} 
-            onBack={() => {
-                setSelectedRecipe(null);
-                navigateTo('HOME', -1);
-            }}
-            onEdit={handleEditRecipe}
+            onBack={() => navigateTo('HOME', -1)}
+            onEdit={(r) => navigateTo('ADD_RECIPE', 1, r)}
             onUpdate={handleSaveRecipe}
             onDelete={handleDeleteRecipe}
             onShowToast={showToast}
@@ -232,21 +246,15 @@ const App: React.FC = () => {
     }
   };
 
-  // Show Navbar on Home and Category Manager views
   const showNavbar = !isLoading && (currentView === 'HOME' || currentView === 'CATEGORY_MANAGER');
 
   const handleNavbarChangeView = (view: ViewState) => {
-      if (view === 'ADD_RECIPE') {
-          setSelectedRecipe(null);
-      }
-      setDirection(1); // Navbar taps usually feel like entering a new context or stack
-      setCurrentView(view);
+      navigateTo(view, 1, null);
   };
 
-  // Framer Motion Variants for iOS-style Push/Pop
   const variants = {
     initial: (dir: number) => ({
-      x: dir > 0 ? '100%' : '-25%', // Enter from right (push) or slightly left (pop)
+      x: dir > 0 ? '100%' : '-25%',
       opacity: dir > 0 ? 1 : 0.9,
       zIndex: dir > 0 ? 10 : 1
     }),
@@ -254,21 +262,13 @@ const App: React.FC = () => {
       x: 0,
       opacity: 1,
       zIndex: 1,
-      transition: { 
-          type: "spring", 
-          stiffness: 260, 
-          damping: 30 
-      }
+      transition: { type: "spring", stiffness: 260, damping: 30 }
     },
     exit: (dir: number) => ({
-      x: dir > 0 ? '-25%' : '100%', // Exit to left (push) or right (pop)
+      x: dir > 0 ? '-25%' : '100%',
       opacity: dir > 0 ? 0.9 : 1,
       zIndex: dir > 0 ? 1 : 10,
-      transition: { 
-        type: "spring", 
-        stiffness: 260, 
-        damping: 30 
-    }
+      transition: { type: "spring", stiffness: 260, damping: 30 }
     })
   };
 
@@ -282,7 +282,7 @@ const App: React.FC = () => {
          ) : (
             <AnimatePresence initial={false} custom={direction} mode='popLayout'>
                 <motion.div
-                    key={currentView}
+                    key={currentView + (selectedRecipe?.id || '')}
                     custom={direction}
                     variants={variants}
                     initial="initial"
@@ -300,7 +300,6 @@ const App: React.FC = () => {
         <Navbar currentView={currentView} onChangeView={handleNavbarChangeView} />
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <Toast 
           message={toast.message} 

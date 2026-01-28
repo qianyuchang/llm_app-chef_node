@@ -11,6 +11,8 @@ import { ImageWithSkeleton } from './ImageWithSkeleton';
 interface HomeProps {
   recipes: Recipe[];
   categories: string[];
+  initialScrollTop?: number;
+  onScroll?: (top: number) => void;
   onOrderModeClick: () => void;
   onRecipeClick: (recipe: Recipe) => void;
   onSettingsClick: () => void;
@@ -26,7 +28,15 @@ const RECOMMENDED_QUERIES = [
     "清淡饮食"
 ];
 
-export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClick, onRecipeClick, onSettingsClick }) => {
+export const Home: React.FC<HomeProps> = ({ 
+  recipes, 
+  categories, 
+  initialScrollTop = 0,
+  onScroll,
+  onOrderModeClick, 
+  onRecipeClick, 
+  onSettingsClick 
+}) => {
   const [activeCategory, setActiveCategory] = useState<string>('全部');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -34,10 +44,22 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   const [aiRecipeIds, setAiRecipeIds] = useState<string[] | null>(null);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const categoryTabContainerRef = useRef<HTMLDivElement>(null);
   const categoryRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const allCategories = ['全部', ...categories];
+
+  // Restore scroll position
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = initialScrollTop;
+    }
+  }, []);
+
+  const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      onScroll?.(e.currentTarget.scrollTop);
+  };
 
   useEffect(() => {
     const activeTab = categoryRefs.current[activeCategory];
@@ -101,7 +123,6 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   const rightColRecipes = filteredRecipes.filter((_, idx) => idx % 2 !== 0);
 
   const renderRecipeCard = (recipe: Recipe, index: number) => {
-    // Determine if this image is among the first few (above the fold)
     const isPriority = index < 4;
     
     return (
@@ -136,7 +157,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
         </div>
 
         <div className="p-4">
-          <h3 className="font-bold text-gray-900 text-[14px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
+          <h3 className="font-bold text-gray-900 text-[14px] font-bold leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
           <div className="flex items-center">
               <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
               {recipe.category}
@@ -221,7 +242,11 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
         </div>
       </div>
 
-      <div className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]">
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleContainerScroll}
+        className="px-4 flex-1 overflow-y-auto no-scrollbar pb-32 bg-[#f2f4f6]"
+      >
         <AnimatePresence mode="wait">
             <motion.div 
                 key={activeCategory + (aiRecipeIds ? 'search' : '')}
