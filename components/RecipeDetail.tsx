@@ -203,9 +203,13 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
         {/* Cover Image Wrapper */}
         <div className="relative h-[420px] w-full group bg-black overflow-hidden">
+            {/* 
+                Optimization: Use 400px thumbnail (Home page size) as lowResSrc.
+                This will result in an instant cache hit when opening detail.
+            */}
             <ImageWithSkeleton 
                 src={getOptimizedImageUrl(recipe.coverImage, 1200)} 
-                lowResSrc={getOptimizedImageUrl(recipe.coverImage, 600)} 
+                lowResSrc={getOptimizedImageUrl(recipe.coverImage, 400, 80)} 
                 alt={recipe.title} 
                 className="w-full h-full object-cover"
                 // @ts-ignore
