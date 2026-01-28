@@ -8,6 +8,7 @@ import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
 import { PROFICIENCY_TEXT } from '../constants';
 import { getOptimizedImageUrl } from '../utils/image';
+import { ImageWithSkeleton } from './ImageWithSkeleton';
 
 interface OrderModeProps {
   recipes: Recipe[];
@@ -242,7 +243,13 @@ export const OrderMode: React.FC<OrderModeProps> = ({ recipes, categories, onBac
                                 const selected = isSelected(recipe.id);
                                 return (
                                     <div key={recipe.id} onClick={() => toggleSelection(recipe.id)} className={`flex gap-3 group p-2 rounded-2xl transition-all cursor-pointer border ${selected ? 'bg-[#1a472a]/5 border-[#1a472a]/20' : 'bg-transparent border-transparent'}`}>
-                                        <img src={getOptimizedImageUrl(recipe.coverImage, 200)} alt={recipe.title} className="w-20 h-20 rounded-xl object-cover bg-gray-100 shadow-sm" />
+                                        <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100 shadow-sm">
+                                            <ImageWithSkeleton 
+                                                src={getOptimizedImageUrl(recipe.coverImage, 200)} 
+                                                alt={recipe.title} 
+                                                className="w-full h-full object-cover" 
+                                            />
+                                        </div>
                                         <div className="flex-1 flex flex-col justify-between py-1">
                                             <h3 className={`font-bold text-sm ${selected ? 'text-[#1a472a]' : 'text-gray-800'}`}>{recipe.title}</h3>
                                             <div className="flex items-center justify-between">

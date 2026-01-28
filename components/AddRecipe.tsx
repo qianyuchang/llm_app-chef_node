@@ -8,6 +8,8 @@ import { ToastType } from './Toast';
 import { Button } from './Button';
 import { useSwipe } from '../hooks/useSwipe';
 import { api } from '../services/api';
+import { compressImage } from '../utils/image';
+import { ImageWithSkeleton } from './ImageWithSkeleton';
 
 interface AddRecipeProps {
   categories: string[];
@@ -128,7 +130,9 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
       try {
           const prompt = `Professional food photography of ${title}, ${category} dish, high resolution, 4k, delicious, appetizing, cinematic lighting, photorealistic.`;
           const image = await api.generateImage(prompt);
-          handleUploadImage(image);
+          // Compress AI generated image before upload
+          const compressed = await compressImage(image);
+          handleUploadImage(compressed);
       } catch (error: any) {
           console.error(error);
           onShowToast(`生成失败: ${error.message}`, 'error');
@@ -236,7 +240,14 @@ export const AddRecipe: React.FC<AddRecipeProps> = ({ categories, onBack, onSave
       <div className="flex-1 overflow-y-auto px-4 pt-6 space-y-6">
         <div className="flex flex-col items-center justify-center mb-4 relative">
           <label className={`relative w-32 h-32 rounded-[2rem] bg-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#1a472a]/50 transition-colors group shadow-sm ${isGeneratingImage || isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-             {coverImage ? <img src={coverImage} alt="Cover" className="w-full h-full object-cover" /> : <><Camera className="text-gray-400 mb-1 group-hover:text-[#1a472a]" size={24} /><input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} /></>}
+             {coverImage ? (
+                <ImageWithSkeleton src={coverImage} alt="Cover" className="w-full h-full object-cover" />
+             ) : (
+                <>
+                    <Camera className="text-gray-400 mb-1 group-hover:text-[#1a472a]" size={24} />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
+                </>
+             )}
              {(isGeneratingImage || isUploading) && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><Loader2 className="animate-spin text-[#1a472a]" /></div>}
           </label>
            <div className="flex gap-4 mt-3">

@@ -6,6 +6,7 @@ import { PROFICIENCY_TEXT } from '../constants';
 import { api } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getOptimizedImageUrl } from '../utils/image';
+import { ImageWithSkeleton } from './ImageWithSkeleton';
 
 interface HomeProps {
   recipes: Recipe[];
@@ -149,7 +150,7 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
     >
       <div className="absolute inset-0 z-20 bg-black opacity-0 active:opacity-5 transition-opacity duration-200 pointer-events-none" />
       <div className="relative w-full overflow-hidden bg-gray-50" style={{ aspectRatio: '3/4' }}>
-        <img 
+        <ImageWithSkeleton 
           src={getOptimizedImageUrl(recipe.coverImage, 600)} 
           alt={recipe.title} 
           className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-105"

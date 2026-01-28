@@ -8,6 +8,7 @@ import { ToastType } from './Toast';
 import { useSwipe } from '../hooks/useSwipe';
 import { api } from '../services/api';
 import { getOptimizedImageUrl } from '../utils/image';
+import { ImageWithSkeleton } from './ImageWithSkeleton';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -166,7 +167,7 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
       <div className="flex-1 overflow-y-auto pb-24">
         {/* Cover Image */}
         <div className="relative h-96 w-full group bg-black">
-            <img 
+            <ImageWithSkeleton 
                 src={getOptimizedImageUrl(recipe.coverImage, 1200)} 
                 alt={recipe.title} 
                 className="w-full h-full object-cover opacity-95"
@@ -270,12 +271,16 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEd
                                         </div>
                                     )}
                                     {log.image && (
-                                        <div className="relative group shrink-0">
-                                            <img src={getOptimizedImageUrl(log.image, 200)} alt="Log" className="w-24 h-24 rounded-xl object-cover bg-gray-100" />
+                                        <div className="relative group shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-gray-100">
+                                            <ImageWithSkeleton 
+                                                src={getOptimizedImageUrl(log.image, 200)} 
+                                                alt="Log" 
+                                                className="w-full h-full object-cover" 
+                                            />
                                             <button 
                                                 onClick={() => handleSetCover(log.id, log.image)}
                                                 disabled={isProcessingThis}
-                                                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-white text-[10px] font-bold flex-col gap-1 disabled:pointer-events-none"
+                                                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold flex-col gap-1 disabled:pointer-events-none z-10"
                                             >
                                                 <ImageIcon size={16} />
                                                 设为封面
