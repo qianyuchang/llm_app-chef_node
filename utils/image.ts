@@ -5,26 +5,33 @@
  * 
  * Format: https://<ZONE>/cdn-cgi/image/<OPTIONS>/<SOURCE-IMAGE>
  */
-export const getOptimizedImageUrl = (url: string, width: number, quality: number = 75) => {
+export const getOptimizedImageUrl = (url: string, width: number, quality: number = 75, blur: number = 0) => {
   if (!url || typeof url !== 'string') return '';
 
   // Only optimize URLs served from our specific CDN domain
-  // We avoid transforming local blobs, data URIs, or external links (like picsum) if not proxied
   if (url.includes('cdn.yufish.tech') && !url.includes('cdn-cgi')) {
     try {
       const urlObj = new URL(url);
-      // Construct the Cloudflare Image Resizing path
-      // width: target width in pixels
-      // format=auto: automatically serve WebP/AVIF if browser supports it
-      // fit=scale-down: matches the width, maintains aspect ratio
-      return `https://${urlObj.hostname}/cdn-cgi/image/width=${width},quality=${quality},format=auto,fit=scale-down${urlObj.pathname}`;
+      
+      // options construction
+      let options = `width=${width},quality=${quality},format=auto,fit=scale-down`;
+      
+      // Add blur for placeholders
+      if (blur > 0) {
+        options += `,blur=${blur}`;
+      } else {
+        // Add subtle sharpening for small thumbnails to make them pop
+        options += `,sharpen=1`;
+      }
+
+      return `https://${urlObj.hostname}/cdn-cgi/image/${options}${urlObj.pathname}`;
     } catch (e) {
       console.warn('Failed to optimize image URL:', e);
       return url;
     }
   }
 
-  // Return original URL for other sources
+  // Return original URL for other sources (like base64 or external blobs)
   return url;
 };
 
@@ -36,7 +43,6 @@ export const compressImage = async (imageSrc: string, maxWidth = 1024, quality =
   return new Promise((resolve, reject) => {
     const img = new Image();
     
-    // Handle raw base64 strings that might be returned by some APIs without the data URI prefix
     if (!imageSrc.startsWith('data:') && !imageSrc.startsWith('http')) {
         img.src = `data:image/jpeg;base64,${imageSrc}`;
     } else {

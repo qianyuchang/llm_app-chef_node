@@ -100,46 +100,52 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
   const leftColRecipes = filteredRecipes.filter((_, idx) => idx % 2 === 0);
   const rightColRecipes = filteredRecipes.filter((_, idx) => idx % 2 !== 0);
 
-  const renderRecipeCard = (recipe: Recipe) => (
-    <div 
-      key={recipe.id} 
-      onClick={() => onRecipeClick(recipe)}
-      className="bg-white rounded-[20px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 transition-all duration-200 active:scale-[0.98] active:shadow-none"
-    >
-      {/* 比例容器 */}
-      <div className="relative w-full overflow-hidden bg-gray-100" style={{ aspectRatio: '3/4' }}>
-        <ImageWithSkeleton 
-          src={getOptimizedImageUrl(recipe.coverImage, 600)} 
-          alt={recipe.title} 
-          className="transition-transform duration-700 group-hover:scale-105"
-          wrapperClassName="absolute inset-0"
-          loading="lazy"
-        />
-        
-        {/* 覆盖层组件 */}
-        <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full shadow-sm z-10">
-           <span className="text-[10px] text-[#385c44] font-bold tracking-tight leading-none pt-[1px]">
-             {PROFICIENCY_TEXT[recipe.proficiency]}
-           </span>
+  const renderRecipeCard = (recipe: Recipe, index: number) => {
+    // Determine if this image is among the first few (above the fold)
+    const isPriority = index < 4;
+    
+    return (
+      <div 
+        key={recipe.id} 
+        onClick={() => onRecipeClick(recipe)}
+        className="bg-white rounded-[20px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-gray-100/50 group cursor-pointer relative mb-4 transition-all duration-200 active:scale-[0.98] active:shadow-none"
+      >
+        <div className="relative w-full overflow-hidden bg-gray-100" style={{ aspectRatio: '3/4' }}>
+          <ImageWithSkeleton 
+            src={getOptimizedImageUrl(recipe.coverImage, 400, 80)} 
+            lowResSrc={getOptimizedImageUrl(recipe.coverImage, 50, 40, 10)} 
+            alt={recipe.title} 
+            className="transition-transform duration-700 group-hover:scale-105"
+            wrapperClassName="absolute inset-0"
+            loading={isPriority ? "eager" : "lazy"}
+            // @ts-ignore
+            fetchpriority={isPriority ? "high" : "auto"}
+          />
+          
+          <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full shadow-sm z-10">
+             <span className="text-[10px] text-[#385c44] font-bold tracking-tight leading-none pt-[1px]">
+               {PROFICIENCY_TEXT[recipe.proficiency]}
+             </span>
+          </div>
+          {recipe.logs && recipe.logs.length > 0 && (
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/30 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10 z-10">
+                  <span className="text-orange-400">🔥</span>
+                  {recipe.logs.length}
+              </div>
+          )}
         </div>
-        {recipe.logs && recipe.logs.length > 0 && (
-            <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-white font-bold bg-black/30 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10 z-10">
-                <Flame size={10} fill="currentColor" className="text-orange-400" />
-                {recipe.logs.length}
-            </div>
-        )}
-      </div>
 
-      <div className="p-4">
-        <h3 className="font-bold text-gray-900 text-[14px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
-        <div className="flex items-center">
-            <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
-            {recipe.category}
-            </span>
+        <div className="p-4">
+          <h3 className="font-bold text-gray-900 text-[14px] leading-snug mb-2 line-clamp-2">{recipe.title}</h3>
+          <div className="flex items-center">
+              <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+              {recipe.category}
+              </span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#f2f4f6]">
@@ -232,8 +238,8 @@ export const Home: React.FC<HomeProps> = ({ recipes, categories, onOrderModeClic
                     </div>
                 ) : filteredRecipes.length > 0 ? (
                     <div className="flex gap-4 items-start">
-                        <div className="flex-1 flex flex-col">{leftColRecipes.map(renderRecipeCard)}</div>
-                        <div className="flex-1 flex flex-col">{rightColRecipes.map(renderRecipeCard)}</div>
+                        <div className="flex-1 flex flex-col">{leftColRecipes.map((r, i) => renderRecipeCard(r, i * 2))}</div>
+                        <div className="flex-1 flex flex-col">{rightColRecipes.map((r, i) => renderRecipeCard(r, i * 2 + 1))}</div>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center pt-24 text-center">
