@@ -243,9 +243,9 @@ app.post('/api/ai/generate-image', async (req, res) => {
     // Determine resolution based on model requirements
     // Seedream 4.5 requires minimum 2K (2048x2048)
     // Seedream 4.0 supports smaller sizes, defaulting to 1K (1024x1024) for efficiency
-    let size = '1024*1024';
+    let size = '1024x1024';
     if (modelName.includes('4-5')) {
-        size = '2048*2048';
+        size = '2048x2048';
     }
 
     try {
@@ -275,9 +275,9 @@ app.post('/api/ai/optimize-image', async (req, res) => {
     const modelName = getImageModel();
     
     // Use the same logic for size as generation
-    let size = '1024*1024';
+    let size = '1024x1024';
     if (modelName.includes('4-5')) {
-        size = '2048*2048';
+        size = '2048x2048';
     }
 
     try {
