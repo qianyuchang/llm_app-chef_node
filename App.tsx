@@ -39,11 +39,15 @@ const App: React.FC = () => {
       setCurrentView('HOME');
       setSelectedRecipe(null);
     } else if (hash.startsWith('#/recipe/')) {
-      const id = hash.replace('#/recipe/', '');
+      // Improved parsing to handle both #/recipe/[id] and #/recipe/[id]/edit
+      const pathParts = hash.replace('#/recipe/', '').split('/');
+      const id = pathParts[0];
+      const isEdit = pathParts[1] === 'edit';
+      
       const recipe = recipesList.find(r => r.id === id);
       if (recipe) {
         setSelectedRecipe(recipe);
-        setCurrentView('RECIPE_DETAIL');
+        setCurrentView(isEdit ? 'ADD_RECIPE' : 'RECIPE_DETAIL');
       } else {
         window.location.hash = '#/';
       }
@@ -79,19 +83,18 @@ const App: React.FC = () => {
     fetchData();
 
     const handleHashChange = () => {
-      // Re-sync state when user clicks back button or shares link
       syncStateWithHash(recipes);
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [recipes.length]); // Re-sync if list changes
+  }, [recipes.length]);
 
   const updateHash = (view: ViewState, recipe?: Recipe | null) => {
     let newHash = '#/';
     switch (view) {
       case 'RECIPE_DETAIL': newHash = `#/recipe/${recipe?.id}`; break;
-      case 'ADD_RECIPE': newHash = recipe ? `#/recipe/${recipe.id}/edit` : '#/add'; break; // Simplified edit route
+      case 'ADD_RECIPE': newHash = recipe ? `#/recipe/${recipe.id}/edit` : '#/add'; break;
       case 'ORDER_MODE': newHash = '#/order'; break;
       case 'CATEGORY_MANAGER': newHash = '#/categories'; break;
       case 'SETTINGS': newHash = '#/settings'; break;
